@@ -1,0 +1,384 @@
+{
+  "other_backends": [
+    "cassandra",
+    "opensearch",
+    "elasticsearch",
+    "lucene",
+    "rabbitmq",
+    "blob-s3",
+    "/s3",
+    "ldap",
+    "activemq",
+    "queue-jms",
+    "data-file",
+    "blob-file",
+    "pulsar",
+    "jpa",
+    "distributed",
+    "kafka",
+    "redis",
+    "aes",
+    "zstd",
+    "linshare",
+    "external-james",
+    "third-party/spamassassin"
+  ],
+  "tests": {
+    "event-bus/api::ErrorHandlingContract#retryShouldDeliverAsManyTimesAsInitialDeliveryAttempt": {
+      "verdict": "fix",
+      "why": "phase 2: check which event bus the postgres-app runs; a redelivery must reach every listener, as the first dispatch does (JAMES-2907)"
+    },
+    "event-bus/in-vm::MemoryEventDeadLettersHealthCheckTest#checkShouldReturnUnHealthyWhenEventDeadLetterError": {
+      "verdict": "keep",
+      "why": "the memory dead letters cannot be made to fail"
+    },
+    "mailbox/api::UidValidityTest#randomShouldNotLeadToCollision": {
+      "verdict": "fix",
+      "why": "phase 2: 125 duplicates per million random UIDVALIDITY values; a reused UIDVALIDITY makes clients keep stale caches"
+    },
+    "mailbox/plugin/deleted-messages-vault::DeletedMessageVaultSearchContract#shouldReturnsMessageWhenPassingAStringInDifferentLocaleToContainsIgnoreCase": {
+      "verdict": "fix",
+      "why": "phase 4: case-insensitive vault search across locales, before the vault is offered"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightExpeditorWhenFromIsSpecified": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightRecipientWhenBccIsSpecified": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightRecipientWhenCcIsSpecified": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightRecipientWhenToIsSpecified": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#andShouldReturnResultsMatchingBothRequests": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#bodyContainsShouldReturnUidOfMessageContainingBothTerms": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerContainsShouldReturnUidsOfMessageHavingThisHeaderWithTheSpecifiedValue": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerDateAfterShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerDateBeforeShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerDateOnShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerExistsShouldReturnUidsOfMessageHavingThisHeader": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerWithDotsShouldBeIndexed": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#internalDateAfterShouldReturnMessagesAfterAGivenDate": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#internalDateBeforeShouldReturnMessagesBeforeAGivenDate": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#modSeqGreaterThanShouldReturnUidsOfMessageHavingAGreaterModSeq": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#modSeqLessThanShouldReturnUidsOfMessageHavingAGreaterModSeq": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#multimailboxSearchShouldReturnUidOfMessageWithExpectedFromInTwoMailboxes": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#notShouldReturnResultsThatDoNotMatchAQuery": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#orShouldReturnResultsMatchinganyRequests": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#revertSortingShouldReturnElementsInAReversedOrder": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#saveDateAfterShouldReturnMessagesAfterAGivenDate": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#saveDateBeforeShouldReturnMessagesBeforeAGivenDate": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnCcShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnFromShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnSizeShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnSubjectShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnToShouldWork": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortShouldOrderMessages": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#uidShouldreturnEveryThing": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "mailbox/scanning-search::SimpleMessageSearchIndexTest#youShouldBeAbleToSpecifySeveralCriterionOnASingleQuery": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    },
+    "metrics/metrics-logger::DefaultMetricFactoryTest#generateWithSameNameShouldReturnMetricsWithCorrelatedCounter": {
+      "verdict": "keep",
+      "why": "metric correlation is not needed (JAMES-3007)"
+    },
+    "metrics/metrics-tests::RecordingMetricFactoryTest#decoratePublisherWithTimerMetricLogP99ShouldRecordANewValueForEachRetry": {
+      "verdict": "fix",
+      "why": "phase 2: flaky test of a test utility; make it deterministic or delete it"
+    },
+    "metrics/metrics-tests::RecordingMetricFactoryTest#decoratePublisherWithTimerMetricShouldRecordANewValueForEachRetry": {
+      "verdict": "fix",
+      "why": "phase 2: flaky test of a test utility; make it deterministic or delete it"
+    },
+    "mpt/impl/imap-mailbox/postgres::PostgresAuthenticatedStateTest#rightsCommandsShouldBeSupported": {
+      "verdict": "fix",
+      "why": "phase 2: IMAP ACL (RFC 4314) commands on PostgreSQL, needed for shared mailboxes (JAMES-3945)"
+    },
+    "mpt/impl/imap-mailbox/postgres::PostgresSelectedStateTest#testSearchSaveDate": {
+      "verdict": "fix",
+      "why": "phase 3: SEARCH SAVEDATE returns nothing on PostgreSQL"
+    },
+    "server/apps/postgres-app::PostgresWithOpenSearchDisabledTest#searchShouldSucceedOnSearchOverrides": {
+      "verdict": "keep",
+      "why": "search overrides are an optimisation; the phase 3 index makes them unneeded"
+    },
+    "server/blob/blob-memory::MemoryBlobStoreDAOTest#listBucketsShouldReturnBucketsWithNoBlob": {
+      "verdict": "keep",
+      "why": "an empty bucket does not exist in these stores, by design"
+    },
+    "server/blob/blob-postgres::PostgresBlobStoreDAOTest#listBucketsShouldReturnBucketsWithNoBlob": {
+      "verdict": "keep",
+      "why": "an empty bucket does not exist in these stores, by design"
+    },
+    "server/container/util::ReactorUtilsTest#throttleShouldGenerateSmallerWindowsWhenUpstreamIsSlow": {
+      "verdict": "keep",
+      "why": "a timing assertion on a slow upstream; no behaviour of ours depends on it"
+    },
+    "server/dns-service/dnsservice-test::AbstractDNSServiceTest#testApache": {
+      "verdict": "keep",
+      "why": "needs the internet; the lane runs offline"
+    },
+    "server/mailet/dkim::CRLFInputStreamBenchmark#launchBenchmark": {
+      "verdict": "keep",
+      "why": "a benchmark, not a test"
+    },
+    "server/mailet/integration-testing::DirectResolutionRemoteDeliveryIntegrationTest#remoteDeliveryShouldAddPerRecipientHeaders": {
+      "verdict": "fix",
+      "why": "phase 5: RemoteDelivery drops per-recipient headers (JAMES-2913); check it cannot leak a Bcc before outbound goes through SES"
+    },
+    "server/mailet/integration-testing::MailetErrorsTest#retryShouldSucceedUponSplittedMail": {
+      "verdict": "fix",
+      "why": "phase 4: the spooler's retry on temporary and permanent errors is what OdooInbound's retries stand on (JAMES-3589)"
+    },
+    "server/mailet/integration-testing::MailetErrorsTest#spoolerShouldEventuallyProcessUponTemporaryError": {
+      "verdict": "fix",
+      "why": "phase 4: the spooler's retry on temporary and permanent errors is what OdooInbound's retries stand on (JAMES-3589)"
+    },
+    "server/mailet/integration-testing::MailetErrorsTest#spoolerShouldNotInfinitLoopUponPermanentError": {
+      "verdict": "fix",
+      "why": "phase 4: the spooler's retry on temporary and permanent errors is what OdooInbound's retries stand on (JAMES-3589)"
+    },
+    "server/mailet/rate-limiter::PerRecipientRateLimitTest#mailetShouldSupportBothCountAndSize": {
+      "verdict": "keep",
+      "why": "the rate limiter is not deployed"
+    },
+    "server/mailet/remote-delivery-integration-testing::DSNRelayTest#orcptIsUnsupported": {
+      "verdict": "keep",
+      "why": "jakarta.mail has no ORCPT parameter (JAMES-3431)"
+    },
+    "server/mailet/remote-delivery-integration-testing::DSNRemoteIntegrationTest#givenAMailWithNotifySuccessWhenItSucceedThenADsnSuccessIsSentBack": {
+      "verdict": "keep",
+      "why": "success DSNs are not offered (JAMES-3431)"
+    },
+    "server/mailrepository/mailrepository-blob::BlobMailRepositoryTest#removeAllShouldReportTheRemovedMails": {
+      "verdict": "keep",
+      "why": "the blob repository cannot tell which blobs back a mail, by design"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/jmap-rfc-8621-integration-tests-common::ImapKeywordsConsistencyContract#emailGetShouldIntersectDraftWhenInconsistencyCreatedViaImap": {
+      "verdict": "keep",
+      "why": "JMAP unions keywords, by RFC 8621"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#emailQueryFilterByTextShouldIgnoreAttachmentContent": {
+      "verdict": "keep",
+      "why": "the memory index; the phase 3 PostgreSQL index is held to these"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#emailQueryFilterByTextShouldIgnoreMarkupsInHtmlBody": {
+      "verdict": "keep",
+      "why": "the memory index; the phase 3 PostgreSQL index is held to these"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#inMailboxAfterSortedByReceivedAtShouldCollapseThreads": {
+      "verdict": "keep",
+      "why": "thread collapsing needs the email query view (JAMES-3340)"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#inMailboxBeforeSortedByReceivedAtShouldCollapseThreads": {
+      "verdict": "keep",
+      "why": "thread collapsing needs the email query view (JAMES-3340)"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#inMailboxSortedByReceivedAtShouldCollapseThreads": {
+      "verdict": "keep",
+      "why": "thread collapsing needs the email query view (JAMES-3340)"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#inMailboxSortedBySentAtShouldCollapseThreads": {
+      "verdict": "keep",
+      "why": "thread collapsing needs the email query view (JAMES-3340)"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#shouldListMailsReceivedAfterADate": {
+      "verdict": "fix",
+      "why": "phase 2: date queries, defects 3.1 (kk hour format) and 3.2 (JVM time zone) of the proof"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodNoViewTest#shouldListMailsReceivedBeforeADate": {
+      "verdict": "fix",
+      "why": "phase 2: date queries, defects 3.1 (kk hour format) and 3.2 (JVM time zone) of the proof"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodTest#emailQueryFilterByTextShouldIgnoreAttachmentContent": {
+      "verdict": "keep",
+      "why": "the memory index; the phase 3 PostgreSQL index is held to these"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodTest#emailQueryFilterByTextShouldIgnoreMarkupsInHtmlBody": {
+      "verdict": "keep",
+      "why": "the memory index; the phase 3 PostgreSQL index is held to these"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodTest#shouldListMailsReceivedAfterADate": {
+      "verdict": "fix",
+      "why": "phase 2: date queries, defects 3.1 (kk hour format) and 3.2 (JVM time zone) of the proof"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailQueryMethodTest#shouldListMailsReceivedBeforeADate": {
+      "verdict": "fix",
+      "why": "phase 2: date queries, defects 3.1 (kk hour format) and 3.2 (JVM time zone) of the proof"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::MemoryEmailSetMethodTest#rangeFlagsRemovalShouldUpdateStoredFlags": {
+      "verdict": "fix",
+      "why": "phase 2: disabled without a reason; flag storage must be right"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresEmailSetMethodTest#newStateShouldBeUpToDate": {
+      "verdict": "fix",
+      "why": "phase 2: the state a JMAP set returns must be current, or clients resynchronise or miss changes"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresEmailSetMethodTest#oldStateShouldIncludeSetChanges": {
+      "verdict": "fix",
+      "why": "phase 2: the state a JMAP set returns must be current, or clients resynchronise or miss changes"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresMailboxSetMethodTest#newStateShouldBeUpToDate": {
+      "verdict": "fix",
+      "why": "phase 2: the state a JMAP set returns must be current, or clients resynchronise or miss changes"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresMailboxSetMethodTest#oldStateShouldIncludeSetChanges": {
+      "verdict": "fix",
+      "why": "phase 2: the state a JMAP set returns must be current, or clients resynchronise or miss changes"
+    },
+    "server/protocols/protocols-imap4::IMAPServerSearchTest#shouldAcceptSeveralFileLiteral": {
+      "verdict": "fix",
+      "why": "phase 2: several literals in one command (JAMES-4043)"
+    },
+    "server/protocols/protocols-managesieve::AuthenticateTest#logoutShouldWorkInAuthenticatedState": {
+      "verdict": "keep",
+      "why": "ManageSieve is not deployed"
+    },
+    "server/protocols/protocols-managesieve::AuthenticateTest#logoutShouldWorkInUnauthenticatedState": {
+      "verdict": "keep",
+      "why": "ManageSieve is not deployed"
+    },
+    "server/protocols/protocols-pop3::POP3ServerTest#testStatUidlListTwoConnections": {
+      "verdict": "keep",
+      "why": "POP3 is not deployed"
+    },
+    "server/protocols/protocols-smtp::SMTPServerTest#testEmptyMessageReceivedHeader": {
+      "verdict": "fix",
+      "why": "phase 5: disabled without a reason; an empty message must still get its Received header"
+    },
+    "server/protocols/webadmin/webadmin-mailbox::MailboxesRoutesTest#fullReIndexingWithCorrectModeShouldRemoveOrphanMessagesInES": {
+      "verdict": "keep",
+      "why": "OpenSearch only"
+    },
+    "server/protocols/webadmin/webadmin-mailbox::MailboxesRoutesTest#mailboxReIndexingWithCorrectModeShouldRemoveOrphanMessagesInES": {
+      "verdict": "keep",
+      "why": "OpenSearch only"
+    },
+    "server/protocols/webadmin/webadmin-mailbox::MalformedUrlRoutesTest#getMailboxesShouldReturnJsonErrorWhenMalformedUrl": {
+      "verdict": "fix",
+      "why": "phase 6: webadmin must answer a malformed URL with a JSON error"
+    },
+    "server/protocols/webadmin/webadmin-mailbox::UserMailboxesRoutesTest#userReprocessingWithCorrectModeShouldRemoveOrphanMessagesInES": {
+      "verdict": "keep",
+      "why": "OpenSearch only"
+    },
+    "server/protocols/webadmin/webadmin-mailbox::UserQuotaRoutesTest#putCountShouldRejectTooSmallValue": {
+      "verdict": "keep",
+      "why": "quota limits are not tied to mailbox counts, by design"
+    },
+    "server/task/task-memory::MemoryTerminationSubscriberTest#dynamicListeningEventsShouldGetOnlyNewEvents": {
+      "verdict": "keep",
+      "why": "unstable memory task subscriber test; the postgres-app's task manager is tested on its own"
+    },
+    "third-party/rspamd::DockerRspamdExtensionTest#DockerRspamdExtensionTest": {
+      "verdict": "fix",
+      "why": "phase 5: Rspamd is deployed (decision F1); run these against a local Rspamd instead of Docker"
+    },
+    "third-party/rspamd::FeedHamToRspamdTaskTest#FeedHamToRspamdTaskTest": {
+      "verdict": "fix",
+      "why": "phase 5: Rspamd is deployed (decision F1); run these against a local Rspamd instead of Docker"
+    },
+    "third-party/rspamd::FeedMessageRouteTest#FeedMessageRouteTest": {
+      "verdict": "fix",
+      "why": "phase 5: Rspamd is deployed (decision F1); run these against a local Rspamd instead of Docker"
+    },
+    "third-party/rspamd::FeedSpamToRspamdTaskTest#FeedSpamToRspamdTaskTest": {
+      "verdict": "fix",
+      "why": "phase 5: Rspamd is deployed (decision F1); run these against a local Rspamd instead of Docker"
+    },
+    "third-party/rspamd::RspamdHttpClientTest#RspamdHttpClientTest": {
+      "verdict": "fix",
+      "why": "phase 5: Rspamd is deployed (decision F1); run these against a local Rspamd instead of Docker"
+    }
+  }
+}

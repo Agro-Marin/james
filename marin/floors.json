@@ -1,0 +1,228 @@
+{
+  "imaptest_scripted": {
+    "base": [
+      52,
+      459
+    ],
+    "extensions": [
+      6,
+      75
+    ],
+    "failing": [
+      "atoms command 3/5",
+      "atoms command 4/5",
+      "fetch-body-message-rfc822 command 3/9",
+      "fetch-body-message-rfc822 command 4/9",
+      "fetch-body-message-rfc822 command 5/9",
+      "fetch-body-message-rfc822 command 6/9",
+      "fetch-body-message-rfc822 command 7/9",
+      "fetch-body-message-rfc822 command 8/9",
+      "fetch-body-message-rfc822-mime command 10/14",
+      "fetch-body-message-rfc822-mime command 11/14",
+      "fetch-body-message-rfc822-mime command 12/14",
+      "fetch-body-message-rfc822-mime command 13/14",
+      "fetch-body-message-rfc822-mime command 3/14",
+      "fetch-body-message-rfc822-mime command 4/14",
+      "fetch-body-message-rfc822-mime command 5/14",
+      "fetch-body-message-rfc822-mime command 6/14",
+      "fetch-body-message-rfc822-mime command 7/14",
+      "fetch-body-message-rfc822-mime command 8/14",
+      "fetch-body-message-rfc822-mime command 9/14",
+      "fetch-body-message-rfc822-x2 command 3/10",
+      "fetch-body-message-rfc822-x2 command 4/10",
+      "fetch-body-message-rfc822-x2 command 5/10",
+      "fetch-body-message-rfc822-x2 command 6/10",
+      "fetch-body-message-rfc822-x2 command 7/10",
+      "fetch-body-message-rfc822-x2 command 8/10",
+      "fetch-body-message-rfc822-x2 command 9/10",
+      "fetch-envelope command 1/2",
+      "listext command 20/34",
+      "listext command 21/34",
+      "move command 11/13",
+      "move command 12/13",
+      "move command 8/13",
+      "search-date command 10/29",
+      "search-date command 11/29",
+      "search-date command 14/29",
+      "search-date command 15/29",
+      "search-date command 16/29",
+      "search-date command 18/29",
+      "search-date command 19/29",
+      "search-date command 2/29",
+      "search-date command 20/29",
+      "search-date command 21/29",
+      "search-date command 22/29",
+      "search-date command 23/29",
+      "search-date command 25/29",
+      "search-date command 26/29",
+      "search-date command 27/29",
+      "search-date command 28/29",
+      "search-date command 3/29",
+      "search-date command 6/29",
+      "search-date command 7/29",
+      "search-date command 8/29",
+      "search-date command 9/29",
+      "search-sets command 12/24",
+      "search-sets command 13/24",
+      "subscribe command 16/24",
+      "subscribe command 23/24"
+    ],
+    "groups": [
+      74,
+      10,
+      37
+    ]
+  },
+  "imaptest_stress_ceilings": {
+    "Keyword '$LabelN' dropped, but it still had N references": 5,
+    "Keyword in PERMANENTFLAGS not introduced with FLAGS": 5,
+    "Keyword used without being in FLAGS": 300,
+    "Message UID=N has \\Recent flag in multiple sessions": 5,
+    "seq too high (N > N, state=APPEND)": 110,
+    "seq too high (N > N, state=EXPUNGE)": 30
+  },
+  "junit": {
+    "junit": {
+      "mailbox/memory": {
+        "skipped": 12,
+        "tests": 664
+      },
+      "mailbox/store": {
+        "skipped": 0,
+        "tests": 473
+      },
+      "mailet/base": {
+        "skipped": 0,
+        "tests": 77
+      },
+      "mailet/standard": {
+        "skipped": 0,
+        "tests": 1630
+      },
+      "mpt/impl/imap-mailbox/inmemory": {
+        "skipped": 0,
+        "tests": 348
+      },
+      "protocols/api": {
+        "skipped": 0,
+        "tests": 38
+      },
+      "protocols/imap": {
+        "skipped": 0,
+        "tests": 2556
+      },
+      "protocols/smtp": {
+        "skipped": 0,
+        "tests": 111
+      },
+      "server/mailet/mailets": {
+        "skipped": 0,
+        "tests": 1060
+      },
+      "server/protocols/jmap-rfc-8621": {
+        "skipped": 0,
+        "tests": 2471
+      },
+      "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests": {
+        "skipped": 9,
+        "tests": 1449
+      },
+      "server/protocols/protocols-imap4": {
+        "skipped": 1,
+        "tests": 637
+      },
+      "server/protocols/protocols-smtp": {
+        "skipped": 1,
+        "tests": 304
+      }
+    },
+    "pg": {
+      "backends-common/postgres": {
+        "skipped": 1,
+        "tests": 57
+      },
+      "mailbox/postgres": {
+        "skipped": 12,
+        "tests": 777
+      },
+      "mpt/impl/imap-mailbox/postgres": {
+        "skipped": 0,
+        "tests": 320
+      },
+      "server/data/data-jmap-postgres": {
+        "skipped": 0,
+        "tests": 334
+      },
+      "server/data/data-postgres": {
+        "skipped": 0,
+        "tests": 456
+      }
+    },
+    "tz-America_Mexico_City": {
+      "mailbox/memory": {
+        "skipped": 12,
+        "tests": 664
+      },
+      "mailbox/store": {
+        "skipped": 0,
+        "tests": 473
+      }
+    },
+    "tz-America_Mexico_City-jmap": {
+      "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests": {
+        "skipped": 8,
+        "tests": 274
+      }
+    },
+    "tz-America_Monterrey": {
+      "mailbox/memory": {
+        "skipped": 12,
+        "tests": 664
+      },
+      "mailbox/store": {
+        "skipped": 0,
+        "tests": 473
+      }
+    },
+    "tz-America_Monterrey-jmap": {
+      "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests": {
+        "skipped": 8,
+        "tests": 274
+      }
+    }
+  },
+  "junit_failing": {
+    "junit": [
+      "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest#"
+    ],
+    "pg": [],
+    "tz-America_Mexico_City": [],
+    "tz-America_Mexico_City-jmap": [],
+    "tz-America_Monterrey": [],
+    "tz-America_Monterrey-jmap": []
+  },
+  "reasons": {
+    "atoms": "not analysed yet; phase 2 analyses it before fixing",
+    "fetch-body-message-rfc822": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",
+    "fetch-body-message-rfc822-mime": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",
+    "fetch-body-message-rfc822-x2": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",
+    "fetch-envelope": "not analysed yet; phase 2 analyses it before fixing",
+    "listext": "not analysed yet; phase 2 analyses it before fixing",
+    "move": "not analysed yet; phase 2 analyses it before fixing",
+    "search-date": "proof 3.3: SENTBEFORE/SENTSINCE/SENTON compare in GMT, not by the Date: header's own date (RFC 3501); phase 2",
+    "search-sets": "not analysed yet; phase 2 analyses it before fixing",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest": "needs Docker (a mock SMTP server container); the lane has none",
+    "subscribe": "not analysed yet; phase 2 analyses it before fixing"
+  },
+  "time_dependent": {
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterSortedByReceivedAtShouldYieldExpectedResult(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterSortedByReceivedAtShouldYieldExpectedResultWithOffsetAndLimit(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterWithSortedByReceivedAtShouldAcceptSharedMailboxesWhenSharesExtension(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterWithSortedBySentAtShouldAcceptSharedMailboxesWhenSharesExtension(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#listMailsReceivedAfterADateShouldBeExclusive(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#queryShouldTakeAllFiltersIntoAccount(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodTest#inMailboxAfterWithSortedBySentAtShouldAcceptSharedMailboxesWhenSharesExtension(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodTest#listMailsReceivedAfterADateShouldBeExclusive(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodTest#queryShouldTakeAllFiltersIntoAccount(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2"
+  }
+}
