@@ -40,7 +40,6 @@ import org.jooq.postgres.extensions.types.Hstore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
@@ -58,7 +57,7 @@ class PostgresTableManagerHstoreExtensionTest {
         .disableRowLevelSecurity()
         .build());
 
-    private final PostgreSQLContainer<?> container = DockerPostgresSingleton.SINGLETON;
+    private final PostgresServer server = PostgresServer.get();
     private String databaseName;
     private PoolBackedPostgresConnectionFactory pool;
     private PostgresExecutor postgresExecutor;
@@ -66,16 +65,17 @@ class PostgresTableManagerHstoreExtensionTest {
     private PostgresConfiguration postgresConfiguration;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         // A database of its own: the one of PostgresExtension already has the hstore extension
         databaseName = "hstore_" + UUID.randomUUID().toString().replace("-", "");
-        container.execInContainer("psql", "-U", DEFAULT_DATABASE.dbUser(), "-c", "CREATE DATABASE " + databaseName + ";");
+        server.start();
+        server.execute(DEFAULT_DATABASE, "postgres", "CREATE DATABASE " + databaseName);
 
         postgresConfiguration = PostgresConfiguration.builder()
             .databaseName(databaseName)
             .databaseSchema(DEFAULT_DATABASE.schema())
-            .host(container.getHost())
-            .port(container.getMappedPort(PostgresFixture.PORT))
+            .host(server.host())
+            .port(server.port())
             .username(DEFAULT_DATABASE.dbUser())
             .password(DEFAULT_DATABASE.dbPassword())
             .rowLevelSecurityEnabled(false)
@@ -94,9 +94,9 @@ class PostgresTableManagerHstoreExtensionTest {
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
         pool.close().block();
-        container.execInContainer("psql", "-U", DEFAULT_DATABASE.dbUser(), "-c", "DROP DATABASE IF EXISTS " + databaseName + " WITH (FORCE);");
+        server.execute(DEFAULT_DATABASE, "postgres", "DROP DATABASE IF EXISTS " + databaseName + " WITH (FORCE)");
     }
 
     @Test

@@ -22,7 +22,6 @@ package org.apache.james.backends.postgres;
 import static org.apache.james.backends.postgres.PostgresFixture.Database.DEFAULT_DATABASE;
 import static org.apache.james.backends.postgres.PostgresFixture.Database.ROW_LEVEL_SECURITY_DATABASE;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -35,9 +34,7 @@ import org.apache.james.backends.postgres.utils.PoolBackedPostgresConnectionFact
 import org.apache.james.backends.postgres.utils.PostgresExecutor;
 import org.apache.james.metrics.tests.RecordingMetricFactory;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.testcontainers.containers.PostgreSQLContainer;
 
-import com.github.fge.lambdas.Throwing;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
@@ -88,7 +85,7 @@ public class PostgresExtension implements GuiceModuleTestExtension {
 
     public static final PoolSize DEFAULT_POOL_SIZE = PoolSize.SMALL;
     public static final Duration DEFAULT_JOOQ_REACTIVE_TIMEOUT = Duration.ofSeconds(20L);
-    public static PostgreSQLContainer<?> PG_CONTAINER = DockerPostgresSingleton.SINGLETON;
+    private static final PostgresServer SERVER = PostgresServer.get();
     private final PostgresDataDefinition postgresDataDefinition;
     private final RowLevelSecurity rowLevelSecurity;
     private final PostgresFixture.Database selectedDatabase;
@@ -108,13 +105,11 @@ public class PostgresExtension implements GuiceModuleTestExtension {
     }
 
     public void pause() {
-        PG_CONTAINER.getDockerClient().pauseContainerCmd(PG_CONTAINER.getContainerId())
-            .exec();
+        SERVER.pause();
     }
 
     public void unpause() {
-        PG_CONTAINER.getDockerClient().unpauseContainerCmd(PG_CONTAINER.getContainerId())
-            .exec();
+        SERVER.unpause();
     }
 
     private PostgresExtension(PostgresDataDefinition postgresDataDefinition, RowLevelSecurity rowLevelSecurity) {
@@ -125,18 +120,16 @@ public class PostgresExtension implements GuiceModuleTestExtension {
         this.postgresDataDefinition = postgresDataDefinition;
         this.rowLevelSecurity = rowLevelSecurity;
         if (rowLevelSecurity.isRowLevelSecurityEnabled()) {
-            this.selectedDatabase = PostgresFixture.Database.ROW_LEVEL_SECURITY_DATABASE;
+            this.selectedDatabase = SERVER.scoped(ROW_LEVEL_SECURITY_DATABASE);
         } else {
-            this.selectedDatabase = DEFAULT_DATABASE;
+            this.selectedDatabase = SERVER.scoped(DEFAULT_DATABASE);
         }
         this.poolSize = maybePoolSize.orElse(DEFAULT_POOL_SIZE);
     }
 
     @Override
-    public void beforeAll(ExtensionContext extensionContext) throws Exception {
-        if (!PG_CONTAINER.isRunning()) {
-            PG_CONTAINER.start();
-        }
+    public void beforeAll(ExtensionContext extensionContext) {
+        SERVER.start();
         querySettingRowLevelSecurityIfNeed();
         querySettingExtension();
         initPostgresSession();
@@ -144,17 +137,20 @@ public class PostgresExtension implements GuiceModuleTestExtension {
 
     private void querySettingRowLevelSecurityIfNeed() {
         if (rowLevelSecurity.isRowLevelSecurityEnabled()) {
-            Throwing.runnable(() -> {
-                PG_CONTAINER.execInContainer("psql", "-U", DEFAULT_DATABASE.dbUser(), "-c", "create user " + ROW_LEVEL_SECURITY_DATABASE.dbUser() + " WITH PASSWORD '" + ROW_LEVEL_SECURITY_DATABASE.dbPassword() + "';");
-                PG_CONTAINER.execInContainer("psql", "-U", DEFAULT_DATABASE.dbUser(), "-c", "create database " + ROW_LEVEL_SECURITY_DATABASE.dbName() + ";");
-                PG_CONTAINER.execInContainer("psql", "-U", DEFAULT_DATABASE.dbUser(), "-c", "grant all privileges on database " + ROW_LEVEL_SECURITY_DATABASE.dbName() + " to " + ROW_LEVEL_SECURITY_DATABASE.dbUser() + ";");
-                PG_CONTAINER.execInContainer("psql", "-U", ROW_LEVEL_SECURITY_DATABASE.dbUser(), "-d", ROW_LEVEL_SECURITY_DATABASE.dbName(), "-c", "create schema if not exists " + ROW_LEVEL_SECURITY_DATABASE.schema() + ";");
-            }).sneakyThrow().run();
+            PostgresFixture.Database main = SERVER.scoped(DEFAULT_DATABASE);
+            SERVER.execute(main, main.dbName(), String.format(
+                "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%1$s') THEN CREATE ROLE %1$s LOGIN PASSWORD '%2$s'; END IF; END $$",
+                selectedDatabase.dbUser(), selectedDatabase.dbPassword()));
+            if (!SERVER.exists(main, main.dbName(), "SELECT EXISTS (SELECT FROM pg_database WHERE datname = '" + selectedDatabase.dbName() + "')")) {
+                SERVER.execute(main, main.dbName(), "CREATE DATABASE " + selectedDatabase.dbName() + " OWNER " + selectedDatabase.dbUser());
+            }
+            SERVER.execute(selectedDatabase, selectedDatabase.dbName(), "CREATE SCHEMA IF NOT EXISTS " + selectedDatabase.schema());
         }
     }
 
-    private void querySettingExtension() throws IOException, InterruptedException {
-        PG_CONTAINER.execInContainer("psql", "-U", selectedDatabase.dbUser(), selectedDatabase.dbName(), "-c", String.format("CREATE EXTENSION IF NOT EXISTS hstore SCHEMA %s;", selectedDatabase.schema()));
+    private void querySettingExtension() {
+        SERVER.execute(SERVER.scoped(DEFAULT_DATABASE), selectedDatabase.dbName(),
+            String.format("CREATE EXTENSION IF NOT EXISTS hstore SCHEMA %s", selectedDatabase.schema()));
     }
 
     private void initPostgresSession() {
@@ -225,8 +221,7 @@ public class PostgresExtension implements GuiceModuleTestExtension {
     }
 
     public void restartContainer() {
-        PG_CONTAINER.stop();
-        PG_CONTAINER.start();
+        SERVER.restart();
         initPostgresSession();
     }
 
@@ -237,11 +232,11 @@ public class PostgresExtension implements GuiceModuleTestExtension {
     }
 
     public String getHost() {
-        return PG_CONTAINER.getHost();
+        return SERVER.host();
     }
 
     public Integer getMappedPort() {
-        return PG_CONTAINER.getMappedPort(PostgresFixture.PORT);
+        return SERVER.port();
     }
 
     public Mono<Connection> getConnection() {
