@@ -11,7 +11,7 @@ merge: an upstream fix is re-implemented by hand. The plan is `agromarin-knowled
 | Stage | What runs |
 |---|---|
 | `build` | `install` of the tested modules and `server/apps/postgres-app`, checkstyle on, JDK 21 |
-| `junit` | 13 modules that need no Docker, `TZ=UTC` |
+| `junit` | 14 modules that need no Docker, `TZ=UTC` |
 | `pg` | 5 PostgreSQL modules against a throwaway PostgreSQL 18 (`-Djames.postgres.external`), `TZ=UTC` |
 | `tz` | the date-sensitive modules again at America/Mexico_City and America/Monterrey |
 | `imap` | Dovecot's `imaptest` against the postgres-app: the scripted suite, then 10 clients for 60 s |
@@ -22,7 +22,7 @@ ours has a verdict in `excluded-tests.json`.
 `floors.json` holds the counts. JUnit counts and the scripted `imaptest` results are exact in both directions,
 failing tests listed by name, each with a reason: a commit that makes a test pass or fail moves its floor in the
 same commit (`marin/lane.sh --update ...`, then review the diff). Stress violations depend on how the clients
-interleave (four runs gave 246 to 282), so each kind has a ceiling instead, about 1.5 times the highest
+interleave (five runs gave 246 to 329), so each kind has a ceiling instead, about 1.5 times the highest
 seen, set by hand and dropped to 0 as each fix lands.
 
 Tools are pinned in `lane/toolchain.env` and fetched or built once into `$LANE_CACHE` (`~/.cache/james-lane`):

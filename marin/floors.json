@@ -76,16 +76,21 @@
   "imaptest_stress_ceilings": {
     "Keyword '$LabelN' dropped, but it still had N references": 5,
     "Keyword in PERMANENTFLAGS not introduced with FLAGS": 5,
-    "Keyword used without being in FLAGS": 300,
+    "Keyword used without being in FLAGS": 340,
     "Message UID=N has \\Recent flag in multiple sessions": 5,
+    "UID changed for sequence N": 5,
     "seq too high (N > N, state=APPEND)": 110,
-    "seq too high (N > N, state=EXPUNGE)": 30
+    "seq too high (N > N, state=EXPUNGE)": 50
   },
   "junit": {
     "junit": {
       "mailbox/memory": {
         "skipped": 12,
         "tests": 664
+      },
+      "mailbox/scanning-search": {
+        "skipped": 2,
+        "tests": 109
       },
       "mailbox/store": {
         "skipped": 0,
@@ -163,6 +168,10 @@
         "skipped": 12,
         "tests": 664
       },
+      "mailbox/scanning-search": {
+        "skipped": 2,
+        "tests": 109
+      },
       "mailbox/store": {
         "skipped": 0,
         "tests": 473
@@ -178,6 +187,10 @@
       "mailbox/memory": {
         "skipped": 12,
         "tests": 664
+      },
+      "mailbox/scanning-search": {
+        "skipped": 2,
+        "tests": 109
       },
       "mailbox/store": {
         "skipped": 0,
