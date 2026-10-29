@@ -213,10 +213,21 @@ public interface SelectedMailbox {
      * Return all applicable Flags for the selected mailbox
      */
     Flags getApplicableFlags();
-    
-    
-    boolean hasNewApplicableFlags();
-    
-    void resetNewApplicableFlags();
+
+    /**
+     * Return the applicable Flags last sent to the client in a FLAGS response
+     */
+    Flags getAnnouncedFlags();
+
+    /**
+     * Records every applicable flag as sent to the client in a FLAGS response, and returns them
+     */
+    Flags announceApplicableFlags();
+
+    /**
+     * Adds a message's flags to the applicable flags. When the client was not yet sent all of them in a FLAGS
+     * response, records them as sent and returns them: the FLAGS response must precede any naming them.
+     */
+    Optional<Flags> announceApplicableFlags(Flags messageFlags);
 
 }

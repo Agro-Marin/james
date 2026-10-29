@@ -53,9 +53,9 @@
     ]
   },
   "imaptest_stress_ceilings": {
-    "Keyword '$LabelN' dropped, but it still had N references": 5,
-    "Keyword in PERMANENTFLAGS not introduced with FLAGS": 5,
-    "Keyword used without being in FLAGS": 340,
+    "Keyword '$LabelN' dropped, but it still had N references": 0,
+    "Keyword in PERMANENTFLAGS not introduced with FLAGS": 0,
+    "Keyword used without being in FLAGS": 0,
     "Message UID=N has \\Recent flag in multiple sessions": 5,
     "UID changed for sequence N": 0,
     "seq too high (N > N, state=APPEND)": 190,
@@ -97,7 +97,7 @@
       },
       "protocols/imap": {
         "skipped": 0,
-        "tests": 2556
+        "tests": 2558
       },
       "protocols/smtp": {
         "skipped": 0,

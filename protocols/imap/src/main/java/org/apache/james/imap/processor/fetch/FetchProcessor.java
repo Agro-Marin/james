@@ -355,6 +355,7 @@ public class FetchProcessor extends AbstractMailboxProcessor<FetchRequest> {
                 .concatMap(range -> Flux.from(mailbox.listMessagesMetadata(range, mailboxSession)))
                 .filter(ids -> !fetch.contains(Item.MODSEQ) || ids.getModSeq().asLong() > fetch.getChangedSince())
                 .concatMap(result -> toResponse(mailbox, fetch, mailboxSession, selected, result))
+                .doOnNext(response -> announceFlags(responder, selected, response, mailboxSession))
                 .doOnNext(responder::respond)
                 .then();
         } else {
@@ -363,16 +364,16 @@ public class FetchProcessor extends AbstractMailboxProcessor<FetchRequest> {
             boolean singleMessage = ranges.size() == 1 && ranges.getFirst().getUidFrom().equals(ranges.getFirst().getUidTo());
             boolean shouldCache = fetch.getBodyElements().stream().anyMatch(bodyFetchElement -> bodyFetchElement.getNumberOfOctets() != null);
             if (singleMessage && shouldCache) {
-                publishMessagesWithCache(selected, mailbox, ranges, fetch, mailboxSession, imapSession, resultToFetch, fetchSubscriber);
+                publishMessagesWithCache(selected, mailbox, ranges, fetch, mailboxSession, imapSession, resultToFetch, responder, fetchSubscriber);
             } else {
-                publishMessagesWithoutCache(selected, mailbox, ranges, fetch, mailboxSession, resultToFetch, fetchSubscriber);
+                publishMessagesWithoutCache(selected, mailbox, ranges, fetch, mailboxSession, resultToFetch, responder, fetchSubscriber);
             }
 
             return fetchSubscriber.completionMono();
         }
     }
 
-    private void publishMessagesWithCache(SelectedMailbox selected, MessageManager mailbox, List<MessageRange> ranges, FetchData fetch, MailboxSession mailboxSession, ImapSession imapSession, FetchGroup resultToFetch, FetchSubscriber fetchSubscriber) {
+    private void publishMessagesWithCache(SelectedMailbox selected, MessageManager mailbox, List<MessageRange> ranges, FetchData fetch, MailboxSession mailboxSession, ImapSession imapSession, FetchGroup resultToFetch, Responder responder, FetchSubscriber fetchSubscriber) {
         DefaultLocalMessageCache localMessageCache = new DefaultLocalMessageCache(imapSession, localCacheConfiguration);
         localMessageCache.lookupInCache(mailbox.getId(), ranges.getFirst().getUidFrom(), resultToFetch)
             .map(result -> {
@@ -389,16 +390,24 @@ public class FetchProcessor extends AbstractMailboxProcessor<FetchRequest> {
                     })))
             .filter(ids -> !fetch.contains(Item.MODSEQ) || ids.getModSeq().asLong() > fetch.getChangedSince())
             .concatMap(result -> toResponse(mailbox, fetch, mailboxSession, selected, result))
+            .doOnNext(response -> announceFlags(responder, selected, response, mailboxSession))
             .subscribe(fetchSubscriber);
     }
 
-    private void publishMessagesWithoutCache(SelectedMailbox selected, MessageManager mailbox, List<MessageRange> ranges, FetchData fetch, MailboxSession mailboxSession, FetchGroup resultToFetch, FetchSubscriber fetchSubscriber) {
+    private void publishMessagesWithoutCache(SelectedMailbox selected, MessageManager mailbox, List<MessageRange> ranges, FetchData fetch, MailboxSession mailboxSession, FetchGroup resultToFetch, Responder responder, FetchSubscriber fetchSubscriber) {
         Flux.fromIterable(consolidate(selected, ranges, fetch))
             .flatMap(range -> ReactorUtils.logAsMono(() -> auditTrail(mailbox, mailboxSession, resultToFetch, range)).thenReturn(range))
             .concatMap(range -> Flux.from(mailbox.getMessagesReactive(range, resultToFetch, mailboxSession)))
             .filter(ids -> !fetch.contains(Item.MODSEQ) || ids.getModSeq().asLong() > fetch.getChangedSince())
             .concatMap(result -> toResponse(mailbox, fetch, mailboxSession, selected, result))
+            .doOnNext(response -> announceFlags(responder, selected, response, mailboxSession))
             .subscribe(fetchSubscriber);
+    }
+
+    private void announceFlags(Responder responder, SelectedMailbox selected, FetchResponse response, MailboxSession mailboxSession) {
+        if (response.getFlags() != null) {
+            announceFlags(responder, selected, response.getFlags(), mailboxSession);
+        }
     }
 
     List<MessageRange> consolidate(SelectedMailbox selected, List<MessageRange> ranges, FetchData fetchData) {

@@ -25,6 +25,7 @@ import static io.vavr.API.Match;
 import static io.vavr.Predicates.instanceOf;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -83,41 +84,40 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     @VisibleForTesting
     static class ApplicableFlags {
         static ApplicableFlags from(Flags flags) {
-            boolean updated = false;
-            return new ApplicableFlags(flags, updated);
+            return new ApplicableFlags(flags, flags);
         }
 
         private final Flags flags;
-        private final boolean updated;
+        private final Flags announced;
 
-        private ApplicableFlags(Flags flags, boolean updated) {
+        private ApplicableFlags(Flags flags, Flags announced) {
             this.flags = flags;
-            this.updated = updated;
+            this.announced = announced;
         }
 
-        public ApplicableFlags ackUpdates() {
-            return new ApplicableFlags(flags, false);
+        public ApplicableFlags announce() {
+            return new ApplicableFlags(flags, flags);
         }
 
         public Flags flags() {
             return new Flags(flags);
         }
 
+        public Flags announced() {
+            return new Flags(announced);
+        }
+
         public boolean updated() {
-            return updated;
+            return !Arrays.asList(announced.getUserFlags()).containsAll(Arrays.asList(flags.getUserFlags()));
         }
 
         public ApplicableFlags updateWithNewFlags(Flags newFlags) {
             Flags updatedFlags = flags();
-            int size = updatedFlags.getUserFlags().length;
-
             updatedFlags.add(newFlags);
             // \RECENT is not a applicable flag in imap so remove it
             // from the list
             updatedFlags.remove(Flag.RECENT);
-
-            boolean applicableFlagsChanged = size < updatedFlags.getUserFlags().length;
-            return new ApplicableFlags(updatedFlags, applicableFlagsChanged);
+            return new ApplicableFlags(updatedFlags, announced);
         }
     }
 
@@ -138,7 +138,7 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     private final AtomicBoolean sizeChanged = new AtomicBoolean(false);
     private final AtomicBoolean silentFlagChanges = new AtomicBoolean(false);
     private final AtomicBoolean readOnly = new AtomicBoolean(false);
-    private ApplicableFlags applicableFlags = ApplicableFlags.from(new Flags());
+    private volatile ApplicableFlags applicableFlags = ApplicableFlags.from(new Flags());
 
     public SelectedMailboxImpl(MailboxManager mailboxManager, EventBus eventBus, MailboxSession session, MessageManager messageManager) {
         this.eventBus = eventBus;
@@ -300,9 +300,6 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
         sizeChanged.set(false);
         flagUpdateUids.clear();
         isDeletedByOtherSession.set(false);
-        long stamp = applicableFlagsLock.writeLock();
-        applicableFlags = applicableFlags.ackUpdates();
-        applicableFlagsLock.unlockWrite(stamp);
     }
 
     @Override
@@ -390,18 +387,35 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
         return applicableFlags.flags();
     }
 
-    
     @Override
-    public boolean hasNewApplicableFlags() {
-        return applicableFlags.updated();
+    public Flags getAnnouncedFlags() {
+        return applicableFlags.announced();
     }
 
-    
     @Override
-    public void resetNewApplicableFlags() {
+    public Flags announceApplicableFlags() {
         long stamp = applicableFlagsLock.writeLock();
-        applicableFlags = applicableFlags.ackUpdates();
-        applicableFlagsLock.unlockWrite(stamp);
+        try {
+            applicableFlags = applicableFlags.announce();
+            return applicableFlags.flags();
+        } finally {
+            applicableFlagsLock.unlockWrite(stamp);
+        }
+    }
+
+    @Override
+    public Optional<Flags> announceApplicableFlags(Flags messageFlags) {
+        long stamp = applicableFlagsLock.writeLock();
+        try {
+            applicableFlags = applicableFlags.updateWithNewFlags(messageFlags);
+            if (!applicableFlags.updated()) {
+                return Optional.empty();
+            }
+            applicableFlags = applicableFlags.announce();
+            return Optional.of(applicableFlags.flags());
+        } finally {
+            applicableFlagsLock.unlockWrite(stamp);
+        }
     }
 
     @Override

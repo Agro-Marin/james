@@ -175,6 +175,20 @@ class SelectedMailboxImplTest {
     }
 
     @Test
+    void announceApplicableFlagsShouldReturnAKeywordReadFromTheStoreBeforeItsEventOnce() throws Exception {
+        when(eventBus.register(any(EventListener.ReactiveEventListener.class), eq(mailboxIdRegistrationKey)))
+            .thenReturn(Mono.just(Mono::empty));
+        SelectedMailboxImpl selectedMailbox = new SelectedMailboxImpl(mailboxManager, eventBus, mock(MailboxSession.class), messageManager);
+        selectedMailbox.finishInit().block();
+        selectedMailbox.announceApplicableFlags();
+
+        assertThat(selectedMailbox.announceApplicableFlags(flagsBuilder().add(SEEN).add(CUSTOM_FLAG).build()))
+            .hasValueSatisfying(flags -> assertThat(flags.getUserFlags()).containsOnly(CUSTOM_FLAG));
+        assertThat(selectedMailbox.announceApplicableFlags(flagsBuilder().add(CUSTOM_FLAG).build())).isEmpty();
+        assertThat(selectedMailbox.getAnnouncedFlags().getUserFlags()).containsOnly(CUSTOM_FLAG);
+    }
+
+    @Test
     void concurrentEventShouldBeProcessedSuccessfullyDuringInitialisation() throws Exception {
         AtomicInteger successCount = new AtomicInteger(0);
         doAnswer(generateEmitEventAnswer(successCount))
@@ -358,6 +372,15 @@ class SelectedMailboxImplTest {
                 assertThat(ap.updated()).isFalse();
                 assertThat(ap.flags()).isEqualTo(flagsBuilder().add(SEEN).add("Foo").build());
             });
+        }
+
+        @Test
+        void updateApplicableFlagsShouldStayUpdatedUntilAnnouncedWhenALaterUpdateAddsNoUserFlag() {
+            ApplicableFlags applicableFlags = ApplicableFlags.from(flagsBuilder().add(SEEN).build());
+            ApplicableFlags withFoo = SelectedMailboxImpl.updateApplicableFlags(applicableFlags, added(flagsBuilder().add("Foo").build()));
+            ApplicableFlags actual = SelectedMailboxImpl.updateApplicableFlags(withFoo, added(flagsBuilder().add(ANSWERED).build()));
+            assertThat(actual.updated()).isTrue();
+            assertThat(actual.announce().updated()).isFalse();
         }
 
         @Test

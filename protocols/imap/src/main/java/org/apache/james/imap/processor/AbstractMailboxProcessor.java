@@ -122,12 +122,16 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
     }
 
     protected void flags(Responder responder, SelectedMailbox selected) {
-        responder.respond(new FlagsResponse(selected.getApplicableFlags()));
+        responder.respond(new FlagsResponse(selected.announceApplicableFlags()));
     }
 
     protected void permanentFlags(Responder responder, Flags permanentFlags, SelectedMailbox selected) {
+        permanentFlags(responder, permanentFlags, selected.getAnnouncedFlags());
+    }
+
+    private void permanentFlags(Responder responder, Flags permanentFlags, Flags applicableFlags) {
         if (permanentFlags.contains(Flags.Flag.USER)) {
-            permanentFlags.add(selected.getApplicableFlags());
+            permanentFlags.add(applicableFlags);
         }
         final StatusResponse untaggedOk = factory.untaggedOk(HumanReadableText.permanentFlags(permanentFlags), ResponseCode.permanentFlags(permanentFlags));
         responder.respond(untaggedOk);
@@ -224,18 +228,19 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
     }
 
     private void addApplicableFlagResponse(ImapSession session, SelectedMailbox selected, ImapProcessor.Responder responder, boolean useUid) {
-        // To be lazily initialized only if needed, which is in minority of cases.
-        MessageManager messageManager = selected.getMessageManager();
-        MailboxSession mailboxSession = session.getMailboxSession();
+        announceFlags(responder, selected, new Flags(), session.getMailboxSession());
+    }
 
-        // Check if we need to send a FLAGS and PERMANENTFLAGS response before the FETCH response
-        // This is the case if some new flag/keyword was used
-        // See IMAP-303
-        if (selected.hasNewApplicableFlags()) {
-            flags(responder, selected);
-            permanentFlags(responder, messageManager.getPermanentFlags(mailboxSession), selected);
-            selected.resetNewApplicableFlags();
-        }
+    /**
+     * Sends FLAGS and PERMANENTFLAGS when a keyword in the given message flags, or one learnt from events, was not
+     * yet sent to the client, so that every FETCH naming it comes after them (IMAP-303). The flags of a FETCH are
+     * read from the store and can carry a keyword another session set before its event reached this mailbox.
+     */
+    protected void announceFlags(Responder responder, SelectedMailbox selected, Flags messageFlags, MailboxSession mailboxSession) {
+        selected.announceApplicableFlags(messageFlags).ifPresent(applicableFlags -> {
+            responder.respond(new FlagsResponse(applicableFlags));
+            permanentFlags(responder, selected.getMessageManager().getPermanentFlags(mailboxSession), applicableFlags);
+        });
     }
     
     private Mono<Void> addFlagsResponses(ImapSession session,
@@ -270,6 +275,7 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
                     } else {
                         flags.remove(Flags.Flag.RECENT);
                     }
+                    announceFlags(responder, selected, flags, mailboxSession);
                     final FetchResponse response;
 
                     // Check if we also need to return the MODSEQ in the response. This is true if CONDSTORE or

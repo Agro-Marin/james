@@ -235,7 +235,7 @@ public class StoreProcessor extends AbstractMailboxProcessor<StoreRequest> {
 
         SelectedMailbox selected = session.getSelected();
         return Mono.from(mailbox.setFlagsReactive(request.getFlags(), request.getFlagsUpdateMode(), messageSet, mailboxSession))
-            .doOnNext(flagsByUid -> handlePermanentFlagChanges(mailboxSession, mailbox, responder, selected))
+            .doOnNext(flagsByUid -> handlePermanentFlagChanges(mailboxSession, responder, selected, flagsByUid))
             .flatMap(flagsByUid -> handleCondstore(request, mailboxSession, mailbox, messageSet, session, responder, silent, unchangedSince, selected, flagsByUid));
     }
 
@@ -252,7 +252,7 @@ public class StoreProcessor extends AbstractMailboxProcessor<StoreRequest> {
         boolean condstoreEnabled = enabled.contains(ImapConstants.SUPPORTS_CONDSTORE);
 
         return Mono.from(mailbox.setFlagsReactive(request.getFlags(), request.getFlagsUpdateMode(), messageSets, mailboxSession))
-            .doOnNext(flagsByUid -> handlePermanentFlagChanges(mailboxSession, mailbox, responder, selected))
+            .doOnNext(flagsByUid -> handlePermanentFlagChanges(mailboxSession, responder, selected, flagsByUid))
             .flatMap(flagsByUid -> {
                 if (!silent || qresyncEnabled || condstoreEnabled) {
                     Mono<Map<MessageUid, ModSeq>> modSeqsMono = (qresyncEnabled || condstoreEnabled)
@@ -289,15 +289,13 @@ public class StoreProcessor extends AbstractMailboxProcessor<StoreRequest> {
         return Mono.empty();
     }
 
-    private void handlePermanentFlagChanges(MailboxSession mailboxSession, MessageManager mailbox, Responder responder, SelectedMailbox selected) {
+    private void handlePermanentFlagChanges(MailboxSession mailboxSession, Responder responder, SelectedMailbox selected, Map<MessageUid, Flags> flagsByUid) {
         // As the STORE command is allowed to create a new "flag/keyword", we need to send a FLAGS and PERMANENTFLAGS response before the FETCH response
         // if some new flag/keyword was used
         // See IMAP-303
-        if (selected.hasNewApplicableFlags()) {
-            flags(responder, selected);
-            permanentFlags(responder, mailbox.getPermanentFlags(mailboxSession), selected);
-            selected.resetNewApplicableFlags();
-        }
+        Flags storedFlags = new Flags();
+        flagsByUid.values().forEach(storedFlags::add);
+        announceFlags(responder, selected, storedFlags, mailboxSession);
     }
 
     private void sendFetchResponses(Responder responder, boolean useUids, boolean silent, long unchangedSince, SelectedMailbox selected, Map<MessageUid, Flags> flagsByUid, boolean qresyncEnabled, boolean condstoreEnabled, Map<MessageUid, ModSeq> modSeqs) {

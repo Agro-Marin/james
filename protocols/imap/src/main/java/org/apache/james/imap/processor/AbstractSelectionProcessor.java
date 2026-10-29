@@ -153,7 +153,6 @@ abstract class AbstractSelectionProcessor<R extends AbstractMailboxSelectionRequ
             .doOnNext(metaData -> {
                 SelectedMailbox selected = session.getSelected();
                 permanentFlags(responder, metaData.getPermanentFlags(), selected);
-                selected.resetNewApplicableFlags();
                 highestModSeq(responder, metaData);
                 uidNext(responder, metaData);
 
