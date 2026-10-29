@@ -1,7 +1,7 @@
 {
   "imaptest_scripted": {
     "base": [
-      47,
+      31,
       459
     ],
     "extensions": [
@@ -41,22 +41,6 @@
       "move command 11/13",
       "move command 12/13",
       "move command 8/13",
-      "search-date command 10/29",
-      "search-date command 11/29",
-      "search-date command 14/29",
-      "search-date command 15/29",
-      "search-date command 16/29",
-      "search-date command 18/29",
-      "search-date command 19/29",
-      "search-date command 20/29",
-      "search-date command 21/29",
-      "search-date command 22/29",
-      "search-date command 23/29",
-      "search-date command 25/29",
-      "search-date command 26/29",
-      "search-date command 27/29",
-      "search-date command 28/29",
-      "search-date command 9/29",
       "search-sets command 12/24",
       "search-sets command 13/24",
       "subscribe command 16/24",
@@ -64,7 +48,7 @@
     ],
     "groups": [
       74,
-      10,
+      9,
       37
     ]
   },
@@ -235,7 +219,6 @@
     "listext": "not analysed yet; phase 2 analyses it before fixing",
     "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest": "needs Docker (a Tika container for attachment text); the lane has none",
     "move": "not analysed yet; phase 2 analyses it before fixing",
-    "search-date": "a search narrowed by a sequence set fetches messages without their headers on PostgreSQL, so SENT* inside 1:7 matches nothing; phase 2",
     "search-sets": "not analysed yet; phase 2 analyses it before fixing",
     "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest": "needs Docker (a mock SMTP server container); the lane has none",
     "subscribe": "not analysed yet; phase 2 analyses it before fixing"

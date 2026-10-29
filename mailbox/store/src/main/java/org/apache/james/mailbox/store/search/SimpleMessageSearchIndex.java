@@ -188,11 +188,11 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
 
         final SortedSet<MailboxMessage> hitSet = new TreeSet<>();
 
+        FetchType fetchType = maxFetchType(getFetchTypeForCriteria(query.getCriteria()), getFetchTypeForSorts(query.getSorts()));
         UidCriterion uidCrit = findConjugatedUidCriterion(query.getCriteria());
         if (uidCrit != null) {
             // if there is a conjugated uid range criterion in the query tree we can optimize by
             // only fetching this uid range
-            FetchType fetchType = maxFetchType(FetchType.METADATA, getFetchTypeForSorts(query.getSorts()));
             UidRange[] ranges = uidCrit.getOperator().getRange();
             for (UidRange r : ranges) {
                 Iterator<MailboxMessage> it = mapper.findInMailbox(mailbox, MessageRange.range(r.getLowValue(), r.getHighValue()), fetchType, UNLIMITED);
@@ -202,7 +202,6 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
             }
         } else {
             // we have to fetch all messages; try to limit their memory requirements
-            FetchType fetchType = maxFetchType(getFetchTypeForCriteria(query.getCriteria()), getFetchTypeForSorts(query.getSorts()));
             Iterator<MailboxMessage> messages = mapper.findInMailbox(mailbox, MessageRange.all(), fetchType, UNLIMITED);
             while (messages.hasNext()) {
                 MailboxMessage m = messages.next();
