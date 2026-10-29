@@ -129,13 +129,13 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     private final MailboxSession mailboxSession;
     private final UidMsnConverter uidMsnConverter;
     private final Set<MessageUid> recentUids = new TreeSet<>();
+    private final Set<MessageUid> addedUids = new TreeSet<>();
     private final Set<MessageUid> flagUpdateUids = new TreeSet<>();
     private final Set<MessageUid> expungedUids = new TreeSet<>();
     private final StampedLock applicableFlagsLock = new StampedLock();
     private final AtomicReference<ReactiveEventListener> idleEventListener = new AtomicReference<>();
     private final AtomicBoolean recentUidRemoved = new AtomicBoolean(false);
     private final AtomicBoolean isDeletedByOtherSession = new AtomicBoolean(false);
-    private final AtomicBoolean sizeChanged = new AtomicBoolean(false);
     private final AtomicBoolean silentFlagChanges = new AtomicBoolean(false);
     private final AtomicBoolean readOnly = new AtomicBoolean(false);
     private volatile ApplicableFlags applicableFlags = ApplicableFlags.from(new Flags());
@@ -163,8 +163,13 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
                 }))
             .then(Flux.from(messageManager.search(SearchQuery.of(SearchQuery.all()), mailboxSession))
                 .collect(ImmutableList.toImmutableList())
-                .doOnNext(uidMsnConverter::addAll))
+                .doOnNext(this::addInitialUids))
             .then();
+    }
+
+    private synchronized void addInitialUids(List<MessageUid> uids) {
+        uidMsnConverter.addAll(uids);
+        applyAddedUids();
     }
 
     @Override
@@ -216,6 +221,7 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     private synchronized void clearInternalStructures() {
         idleEventListener.set(null);
         uidMsnConverter.clear();
+        addedUids.clear();
         flagUpdateUids.clear();
 
         expungedUids.clear();
@@ -253,14 +259,19 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
 
     @Override
     public synchronized Collection<MessageUid> getRecent() {
-        checkExpungedRecents();
-        return new ArrayList<>(recentUids);
+        return new ArrayList<>(knownRecentUids());
     }
 
     @Override
     public synchronized int recentCount() {
-        checkExpungedRecents();
-        return recentUids.size();
+        return knownRecentUids().size();
+    }
+
+    // An APPEND or a \Recent flag update can name a UID before its EXISTS response, or after its EXPUNGE one.
+    private List<MessageUid> knownRecentUids() {
+        return recentUids.stream()
+            .filter(uid -> uidMsnConverter.getMsn(uid).foldSilent(() -> false, msn -> true))
+            .collect(ImmutableList.toImmutableList());
     }
 
     @Override
@@ -272,12 +283,6 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     @Override
     public MailboxId getMailboxId() {
         return mailboxId;
-    }
-
-    private void checkExpungedRecents() {
-        for (MessageUid uid : expungedUids) {
-            removeRecent(uid);
-        }
     }
 
     @Override
@@ -297,13 +302,23 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
 
     @Override
     public synchronized void resetEvents() {
-        sizeChanged.set(false);
-        flagUpdateUids.clear();
         isDeletedByOtherSession.set(false);
     }
 
     @Override
-    public NullableMessageSequenceNumber remove(MessageUid uid) {
+    public synchronized boolean applyAddedUids() {
+        if (addedUids.isEmpty()) {
+            return false;
+        }
+        uidMsnConverter.addAll(addedUids);
+        recentUids.addAll(addedUids);
+        addedUids.clear();
+        return true;
+    }
+
+    @Override
+    public synchronized NullableMessageSequenceNumber remove(MessageUid uid) {
+        recentUids.remove(uid);
         return uidMsnConverter.getAndRemove(uid);
     }
 
@@ -325,8 +340,8 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     }
     
     @Override
-    public synchronized void resetExpungedUids() {
-        expungedUids.clear();
+    public synchronized void resetExpungedUids(Collection<MessageUid> sentUids) {
+        expungedUids.removeAll(sentUids);
     }
 
     /**
@@ -338,17 +353,6 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
      */
     public final void setSilentFlagChanges(boolean silentFlagChanges) {
         this.silentFlagChanges.set(silentFlagChanges);
-    }
-
-    /**
-     * Has the size of the mailbox changed?
-     * 
-     * @return true if new messages have been added, false otherwise
-     */
-
-    @Override
-    public final boolean isSizeChanged() {
-        return sizeChanged.get();
     }
 
     /**
@@ -364,14 +368,16 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     }
 
     /**
-     * Return a unmodifiable {@link Collection} of uids which have updated flags
+     * Remove and return the uids which have updated flags since the last call
      */
     @Override
-    public synchronized Collection<MessageUid> flagUpdateUids() {
+    public synchronized Collection<MessageUid> takeFlagUpdateUids() {
         // copy the TreeSet to fix possible
         // java.util.ConcurrentModificationException
         // See IMAP-278
-        return ImmutableSortedSet.copyOf(flagUpdateUids);
+        Collection<MessageUid> uids = ImmutableSortedSet.copyOf(flagUpdateUids);
+        flagUpdateUids.clear();
+        return uids;
     }
 
     @Override
@@ -462,7 +468,10 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     }
 
     private Void handleMailboxExpunge(MessageEvent messageEvent) {
-        expungedUids.addAll(messageEvent.getUids());
+        // A UID the client has no EXISTS for yet leaves without an EXPUNGE, whose sequence number it could not know
+        messageEvent.getUids().stream()
+            .filter(uid -> !addedUids.remove(uid))
+            .forEach(expungedUids::add);
         return VOID;
     }
 
@@ -494,9 +503,7 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
     }
 
     private Void handleAddition(Added added) {
-        sizeChanged.set(true);
-        uidMsnConverter.addAll(added.getUids());
-        recentUids.addAll(added.getUids());
+        addedUids.addAll(added.getUids());
         long stamp = applicableFlagsLock.writeLock();
         applicableFlags = updateApplicableFlags(applicableFlags, added);
         applicableFlagsLock.unlockWrite(stamp);

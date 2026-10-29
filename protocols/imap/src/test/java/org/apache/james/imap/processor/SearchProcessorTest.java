@@ -203,8 +203,8 @@ class SearchProcessorTest {
         when(mailboxManager.getMailboxReactive(mailboxId, mailboxSession)).thenReturn(Mono.just(mailbox));
         session.selected(selectedMailbox).block();
         when(selectedMailbox.isRecentUidRemoved()).thenReturn(false);
-        when(selectedMailbox.isSizeChanged()).thenReturn(false);
-        when(selectedMailbox.flagUpdateUids()).thenReturn(Collections.<MessageUid>emptyList());
+        when(selectedMailbox.applyAddedUids()).thenReturn(false);
+        when(selectedMailbox.takeFlagUpdateUids()).thenReturn(Collections.<MessageUid>emptyList());
         when(selectedMailbox.getRecent()).thenReturn(new ArrayList<>());
     }
 

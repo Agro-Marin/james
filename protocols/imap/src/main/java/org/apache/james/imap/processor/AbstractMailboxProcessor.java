@@ -30,6 +30,7 @@ import java.util.Set;
 import jakarta.mail.Flags;
 
 import org.apache.james.imap.api.ImapConstants;
+import org.apache.james.imap.api.ImapSessionState;
 import org.apache.james.imap.api.display.HumanReadableText;
 import org.apache.james.imap.api.message.Capability;
 import org.apache.james.imap.api.message.IdRange;
@@ -97,7 +98,8 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
 
             return Mono.from(metricFactory.decoratePublisherWithTimerMetric(IMAP_PREFIX + acceptableMessage.getCommand().getName(),
                 mailboxManager.manageProcessing(
-                    processRequestReactive(acceptableMessage, session, responder)
+                    Mono.fromRunnable(() -> announceAddedUids(acceptableMessage, session, responder))
+                        .then(Mono.defer(() -> processRequestReactive(acceptableMessage, session, responder)))
                         .onErrorResume(DeniedAccessOnSharedMailboxException.class, e -> {
                             no(acceptableMessage, responder, HumanReadableText.DENIED_SHARED_MAILBOX);
                             return Mono.empty();
@@ -118,6 +120,16 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
             ImapResponseMessage response = factory.taggedNo(acceptableMessage.getTag(), acceptableMessage.getCommand(), HumanReadableText.INVALID_COMMAND);
             responder.respond(response);
             return Mono.empty();
+        }
+    }
+
+    // A selected-state command resolves its sequence numbers against what this session knows; messages added
+    // since its last EXISTS are announced first, so it can name them and no response names them before EXISTS.
+    private void announceAddedUids(R request, ImapSession session, Responder responder) {
+        SelectedMailbox selected = session.getSelected();
+        if (selected != null && !request.getCommand().validForState(ImapSessionState.AUTHENTICATED) && selected.applyAddedUids()) {
+            addExistsResponses(selected, responder);
+            addRecentResponses(selected, responder);
         }
     }
 
@@ -157,7 +169,7 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
 
     private Mono<Void> unsolicitedResponses(ImapSession session, ImapProcessor.Responder responder, SelectedMailbox selected, boolean omitExpunged, boolean useUid) {
         return Mono.fromRunnable(() -> {
-            boolean sizeChanged = selected.isSizeChanged();
+            boolean sizeChanged = selected.applyAddedUids();
             // New message response
             if (sizeChanged) {
                 addExistsResponses(selected, responder);
@@ -173,7 +185,7 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
                         addExpungedResponses(selected, expungedUids, responder);
                     }
                     // Only reset the events if we send the EXPUNGE or VANISHED responses. See IMAP-286
-                    selected.resetExpungedUids();
+                    selected.resetExpungedUids(expungedUids);
                 }
 
             }
@@ -210,7 +222,7 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
         MessageManager messageManager = selected.getMessageManager();
         MailboxSession mailboxSession = session.getMailboxSession();
 
-        Collection<MessageUid> flagUpdateUids = selected.flagUpdateUids();
+        Collection<MessageUid> flagUpdateUids = selected.takeFlagUpdateUids();
         if (!flagUpdateUids.isEmpty()) {
 
             return Mono.fromRunnable(() -> addApplicableFlagResponse(session, selected, responder, useUid))

@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.Optional;
 
@@ -44,6 +45,7 @@ import org.apache.james.mailbox.MessageManager;
 import org.apache.james.mailbox.MessageUid;
 import org.apache.james.mailbox.ModSeq;
 import org.apache.james.mailbox.events.MailboxEvents.Added;
+import org.apache.james.mailbox.events.MailboxEvents.Expunged;
 import org.apache.james.mailbox.events.MailboxEvents.FlagsUpdated;
 import org.apache.james.mailbox.events.MailboxEvents.MailboxAdded;
 import org.apache.james.mailbox.events.MailboxEvents.MailboxEvent;
@@ -88,6 +90,7 @@ class MailboxEventAnalyserTest {
         .build();
 
     private static final MessageUid MESSAGE_UID = MessageUid.of(1);
+    private static final MessageUid ADDED_UID = MessageUid.of(11);
     private static final Username USER = Username.of("user");
     private static final MailboxSession MAILBOX_SESSION = MailboxSessionUtil.create(USER);
     private static final MailboxSession OTHER_MAILBOX_SESSION = MailboxSessionUtil.create(USER);
@@ -99,7 +102,7 @@ class MailboxEventAnalyserTest {
         .randomEventId()
         .mailboxSession(MAILBOX_SESSION)
         .mailbox(DEFAULT_MAILBOX)
-        .addMetaData(new MessageMetaData(MessageUid.of(11), ModSeq.first(), new Flags(), 45, new Date(), Optional.empty(), new DefaultMessageId(), ThreadId.fromBaseMessageId(new DefaultMessageId())))
+        .addMetaData(new MessageMetaData(ADDED_UID, ModSeq.first(), new Flags(), 45, new Date(), Optional.empty(), new DefaultMessageId(), ThreadId.fromBaseMessageId(new DefaultMessageId())))
         .isDelivery(!IS_DELIVERY)
         .isAppended(!IS_APPENDED)
         .build();
@@ -141,22 +144,80 @@ class MailboxEventAnalyserTest {
       
         testee.event(event);
 
-        assertThat(testee.isSizeChanged()).isFalse();
+        assertThat(testee.applyAddedUids()).isFalse();
     }
 
     @Test
     void testShouldBeNoSizeChangeOnAdded() throws Exception {
         testee.event(ADDED);
 
-        assertThat(testee.isSizeChanged()).isTrue();
+        assertThat(testee.applyAddedUids()).isTrue();
     }
 
     @Test
-    void testShouldNoSizeChangeAfterReset() throws Exception {
+    void testShouldNoSizeChangeAfterApply() throws Exception {
         testee.event(ADDED);
-        testee.resetEvents();
+        testee.applyAddedUids();
 
-        assertThat(testee.isSizeChanged()).isFalse();
+        assertThat(testee.applyAddedUids()).isFalse();
+    }
+
+    @Test
+    void addedUidShouldHaveNoSequenceNumberUntilApplied() throws Exception {
+        testee.event(ADDED);
+
+        assertThat(testee.existsCount()).isEqualTo(1);
+        assertThat(testee.recentCount()).isZero();
+        assertThat(testee.getLastUid()).contains(MESSAGE_UID);
+
+        testee.applyAddedUids();
+
+        assertThat(testee.existsCount()).isEqualTo(2);
+        assertThat(testee.recentCount()).isEqualTo(1);
+        assertThat(testee.getLastUid()).contains(ADDED_UID);
+    }
+
+    @Test
+    void uidExpungedBeforeItsExistsShouldNeedNoExpunge() throws Exception {
+        testee.event(ADDED);
+        testee.event(expunged(ADDED_UID));
+
+        assertThat(testee.applyAddedUids()).isFalse();
+        assertThat(testee.expungedUids()).isEmpty();
+        assertThat(testee.existsCount()).isEqualTo(1);
+    }
+
+    @Test
+    void expungedUidShouldStopBeingRecentWhenRemoved() throws Exception {
+        testee.event(ADDED);
+        testee.applyAddedUids();
+        testee.event(expunged(ADDED_UID));
+        Collection<MessageUid> sent = testee.expungedUids();
+        sent.forEach(testee::remove);
+        testee.resetExpungedUids(sent);
+
+        assertThat(testee.recentCount()).isZero();
+    }
+
+    @Test
+    void resetExpungedUidsShouldKeepAnExpungeReceivedAfterTheSentOnes() throws Exception {
+        testee.event(ADDED);
+        testee.applyAddedUids();
+        testee.event(expunged(MESSAGE_UID));
+        Collection<MessageUid> sent = testee.expungedUids();
+        testee.event(expunged(ADDED_UID));
+        testee.resetExpungedUids(sent);
+
+        assertThat(testee.expungedUids()).containsExactly(ADDED_UID);
+    }
+
+    private Expunged expunged(MessageUid uid) {
+        return EventFactory.expunged()
+            .randomEventId()
+            .mailboxSession(OTHER_MAILBOX_SESSION)
+            .mailbox(DEFAULT_MAILBOX)
+            .addMetaData(new MessageMetaData(uid, ModSeq.first(), new Flags(), 45, new Date(), Optional.empty(), new DefaultMessageId(), ThreadId.fromBaseMessageId(new DefaultMessageId())))
+            .build();
     }
 
     @Test
@@ -170,7 +231,7 @@ class MailboxEventAnalyserTest {
 
         testee.event(update);
 
-        assertThat(testee.flagUpdateUids()).isEmpty();
+        assertThat(testee.takeFlagUpdateUids()).isEmpty();
     }
 
     @Test
@@ -184,7 +245,7 @@ class MailboxEventAnalyserTest {
 
         testee.event(update);
 
-       assertThat(testee.flagUpdateUids())
+       assertThat(testee.takeFlagUpdateUids())
            .containsExactly(UID);
     }
 
@@ -203,7 +264,7 @@ class MailboxEventAnalyserTest {
         analyser.event(update);
         analyser.deselect().block();
 
-        assertThat(analyser.flagUpdateUids()).isEmpty();
+        assertThat(analyser.takeFlagUpdateUids()).isEmpty();
     }
 
     @Test
@@ -219,7 +280,7 @@ class MailboxEventAnalyserTest {
         testee.setSilentFlagChanges(true);
         testee.event(update);
 
-        assertThat(testee.flagUpdateUids())
+        assertThat(testee.takeFlagUpdateUids())
             .containsExactly(UID);
     }
 
@@ -236,7 +297,7 @@ class MailboxEventAnalyserTest {
         testee.setSilentFlagChanges(true);
         testee.event(update);
 
-        assertThat(testee.flagUpdateUids())
+        assertThat(testee.takeFlagUpdateUids())
             .isEmpty();
     }
 
@@ -251,7 +312,7 @@ class MailboxEventAnalyserTest {
 
         testee.event(update);
 
-        assertThat(testee.flagUpdateUids())
+        assertThat(testee.takeFlagUpdateUids())
             .isEmpty();
     }
 }

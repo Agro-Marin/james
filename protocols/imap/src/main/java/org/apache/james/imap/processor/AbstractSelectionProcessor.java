@@ -390,6 +390,7 @@ abstract class AbstractSelectionProcessor<R extends AbstractMailboxSelectionRequ
 
     private void exists(Responder responder, MailboxMetaData metaData, SelectedMailbox selectedMailbox) {
         long messageCount = metaData.getMessageCount();
+        selectedMailbox.applyAddedUids();
         long realMessageCount = selectedMailbox.existsCount();
 
         responder.respond(new ExistsResponse(realMessageCount));

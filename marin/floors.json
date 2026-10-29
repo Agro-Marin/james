@@ -58,8 +58,8 @@
     "Keyword used without being in FLAGS": 0,
     "Message UID=N has \\Recent flag in multiple sessions": 5,
     "UID changed for sequence N": 0,
-    "seq too high (N > N, state=APPEND)": 190,
-    "seq too high (N > N, state=EXPUNGE)": 50
+    "seq too high (N > N, state=APPEND)": 0,
+    "seq too high (N > N, state=EXPUNGE)": 0
   },
   "junit": {
     "junit": {
@@ -97,7 +97,7 @@
       },
       "protocols/imap": {
         "skipped": 0,
-        "tests": 2558
+        "tests": 2562
       },
       "protocols/smtp": {
         "skipped": 0,

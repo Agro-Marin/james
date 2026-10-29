@@ -131,11 +131,12 @@ public interface SelectedMailbox {
     boolean isDeletedByOtherSession();
 
     /**
-     * Is the size of the mailbox changed ?
-     * 
-     * @return true if the mailbox size was changed
+     * Give the uids added since the last call sequence numbers, after every known message. Until then no
+     * response names them, so the caller must send the EXISTS response announcing them.
+     *
+     * @return true if uids were added
      */
-    boolean isSizeChanged();
+    boolean applyAddedUids();
 
     /**
      * Was the recent uid removed ?
@@ -157,8 +158,10 @@ public interface SelectedMailbox {
      */
     Collection<MessageUid> expungedUids();
 
-    
-    void resetExpungedUids();
+    /**
+     * Forget the given expunged uids, once their EXPUNGE or VANISHED responses were sent
+     */
+    void resetExpungedUids(Collection<MessageUid> sentUids);
     
     /**
      * Removes the given UID.
@@ -172,10 +175,9 @@ public interface SelectedMailbox {
     NullableMessageSequenceNumber remove(MessageUid uid);
 
     /**
-     * Return a Collection which holds all uids reflecting the Messages which
-     * flags were updated
+     * Remove and return the uids of the Messages which flags were updated since the last call
      */
-    Collection<MessageUid> flagUpdateUids();
+    Collection<MessageUid> takeFlagUpdateUids();
 
     /**
      * Return the uid of the first message in the mailbox or empty if the mailbox
