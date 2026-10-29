@@ -22,7 +22,9 @@ package org.apache.james.mailbox.store.search;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
-import java.text.SimpleDateFormat;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
@@ -595,9 +597,7 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
     }
 
     private boolean on(Date date1, Date date2, DateResolution dateResolution) {
-        String d1 = createDateString(date1, dateResolution);
-        String d2 = createDateString(date2, dateResolution);
-        return d1.compareTo(d2) == 0;
+        return compare(date1, date2, dateResolution) == 0;
     }
 
     private boolean on(Optional<Date> thisDate, Date thatDate, DateResolution dateResolution) {
@@ -606,10 +606,7 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
     }
 
     private boolean before(Date date1, Date date2, DateResolution dateResolution) {
-        String d1 = createDateString(date1, dateResolution);
-        String d2 = createDateString(date2, dateResolution);
-
-        return d1.compareTo(d2) < 0;
+        return compare(date1, date2, dateResolution) < 0;
     }
 
     private boolean before(Optional<Date> thisDate, Date thatDate, DateResolution dateResolution) {
@@ -618,10 +615,7 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
     }
 
     private boolean after(Date date1, Date date2, DateResolution dateResolution) {
-        String d1 = createDateString(date1, dateResolution);
-        String d2 = createDateString(date2, dateResolution);
-
-        return d1.compareTo(d2) > 0;
+        return compare(date1, date2, dateResolution) > 0;
     }
 
     private boolean after(Optional<Date> thisDate, Date thatDate, DateResolution dateResolution) {
@@ -629,33 +623,20 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
             .orElse(false);
     }
 
-    private String createDateString(Date date, DateResolution dateResolution) {
-        SimpleDateFormat format = createFormat(dateResolution);
-        format.setCalendar(getGMT());
-        return format.format(date);
+    private int compare(Date date1, Date date2, DateResolution dateResolution) {
+        return truncate(date1, dateResolution).compareTo(truncate(date2, dateResolution));
     }
 
-    private SimpleDateFormat createFormat(DateResolution dateResolution) {
-        switch (dateResolution) {
-            case Year:
-                return new SimpleDateFormat("yyyy");
-            case Month:
-                return new SimpleDateFormat("yyyyMM");
-            case Day:
-                return new SimpleDateFormat("yyyyMMdd");
-            case Hour:
-                return new SimpleDateFormat("yyyyMMddkk");
-            case Minute:
-                return new SimpleDateFormat("yyyyMMddkkmm");
-            case Second:
-                return new SimpleDateFormat("yyyyMMddkkmmss");
-            default:
-                return new SimpleDateFormat("yyyyMMddkkmmssSSS");
-        }
-    }
-
-    private Calendar getGMT() {
-        return Calendar.getInstance(TimeZone.getTimeZone("GMT"), Locale.ENGLISH);
+    private ZonedDateTime truncate(Date date, DateResolution dateResolution) {
+        ZonedDateTime utc = date.toInstant().atZone(ZoneOffset.UTC);
+        return switch (dateResolution) {
+            case Year -> utc.truncatedTo(ChronoUnit.DAYS).withDayOfYear(1);
+            case Month -> utc.truncatedTo(ChronoUnit.DAYS).withDayOfMonth(1);
+            case Day -> utc.truncatedTo(ChronoUnit.DAYS);
+            case Hour -> utc.truncatedTo(ChronoUnit.HOURS);
+            case Minute -> utc.truncatedTo(ChronoUnit.MINUTES);
+            case Second -> utc.truncatedTo(ChronoUnit.SECONDS);
+        };
     }
 
     private Calendar getGMT(int timeZone) {

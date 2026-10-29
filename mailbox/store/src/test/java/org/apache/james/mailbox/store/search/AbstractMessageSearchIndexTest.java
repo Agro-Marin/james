@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -940,6 +941,51 @@ public abstract class AbstractMessageSearchIndexTest {
 
         assertThat(messageSearchIndex.search(session, mailbox, searchQuery).toStream())
             .containsOnly(m3.getUid());
+    }
+
+    @Test
+    void internalDateBeforeShouldCompareTheMidnightHourAsTheFirstOfTheDay() throws Exception {
+        MessageManager messageManager = midnightMailbox();
+        ComposedMessageId atHalfPastMidnight = appendAt(messageManager, "2014-07-02T00:30:00Z");
+        appendAt(messageManager, "2014-07-02T05:00:00Z");
+        awaitMessageCount(ImmutableList.of(), SearchQuery.matchAll(), 15);
+
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.internalDateBefore(
+            Date.from(Instant.parse("2014-07-02T03:00:00Z")),
+            DateResolution.Second));
+
+        assertThat(Flux.from(messageManager.search(searchQuery, session)).toStream())
+            .containsOnly(atHalfPastMidnight.getUid());
+    }
+
+    @Test
+    void internalDateAfterShouldCompareTheMidnightHourAsTheFirstOfTheDay() throws Exception {
+        MessageManager messageManager = midnightMailbox();
+        appendAt(messageManager, "2014-07-02T00:30:00Z");
+        ComposedMessageId atFive = appendAt(messageManager, "2014-07-02T05:00:00Z");
+        awaitMessageCount(ImmutableList.of(), SearchQuery.matchAll(), 15);
+
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.internalDateAfter(
+            Date.from(Instant.parse("2014-07-02T03:00:00Z")),
+            DateResolution.Second));
+
+        assertThat(Flux.from(messageManager.search(searchQuery, session)).toStream())
+            .containsOnly(atFive.getUid());
+    }
+
+    private MessageManager midnightMailbox() throws Exception {
+        MailboxPath mailboxPath = MailboxPath.forUser(USERNAME, "midnight");
+        storeMailboxManager.createMailbox(mailboxPath, session);
+        return storeMailboxManager.getMailbox(mailboxPath, session);
+    }
+
+    private ComposedMessageId appendAt(MessageManager messageManager, String internalDate) throws Exception {
+        return messageManager.appendMessage(MessageManager.AppendCommand.builder()
+            .withInternalDate(Date.from(Instant.parse(internalDate)))
+            .build(Message.Builder.of()
+                .setSubject("test")
+                .setBody("testmail", StandardCharsets.UTF_8)),
+            session).getId();
     }
 
     @Test

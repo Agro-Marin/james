@@ -90,7 +90,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 109
+        "tests": 111
       },
       "mailbox/store": {
         "skipped": 0,
@@ -170,7 +170,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 109
+        "tests": 111
       },
       "mailbox/store": {
         "skipped": 0,
@@ -190,7 +190,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 109
+        "tests": 111
       },
       "mailbox/store": {
         "skipped": 0,
