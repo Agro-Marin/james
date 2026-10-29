@@ -64,6 +64,8 @@ import static org.apache.james.mailbox.lucene.search.DocumentFieldConstants.TO_F
 import static org.apache.james.mailbox.lucene.search.DocumentFieldConstants.UID_FIELD;
 import static org.apache.james.mailbox.lucene.search.DocumentFieldConstants.USERS;
 
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
@@ -155,8 +157,7 @@ public class LuceneIndexableDocument {
         indexInternalDateFields(message.getInternalDate(), doc);
         message.getSaveDate().ifPresent(saveDate -> indexSaveDateFields(saveDate, doc));
         headerCollection.getSentDate()
-            .map(zonedDateTime -> Date.from(zonedDateTime.toInstant()))
-            .or(() -> Optional.ofNullable(message.getInternalDate()))
+            .or(() -> Optional.ofNullable(message.getInternalDate()).map(date -> date.toInstant().atZone(ZoneOffset.UTC)))
             .ifPresent(sentDate -> indexSentDateFields(sentDate, doc));
 
         // index header
@@ -271,10 +272,13 @@ public class LuceneIndexableDocument {
         doc.add(new NumericDocValuesField(INTERNAL_DATE_FIELD_MILLISECOND_RESOLUTION, Long.parseLong(DateTools.dateToString(date, DateTools.Resolution.MILLISECOND))));
     }
 
-    private static void indexSentDateFields(Date sentDate, Document doc) {
-        doc.add(new StringField(SENT_DATE_FIELD_YEAR_RESOLUTION, DateTools.dateToString(sentDate, DateTools.Resolution.YEAR), Field.Store.NO));
-        doc.add(new StringField(SENT_DATE_FIELD_MONTH_RESOLUTION, DateTools.dateToString(sentDate, DateTools.Resolution.MONTH), Field.Store.NO));
-        doc.add(new StringField(SENT_DATE_FIELD_DAY_RESOLUTION, DateTools.dateToString(sentDate, DateTools.Resolution.DAY), Field.Store.NO));
+    private static void indexSentDateFields(ZonedDateTime sentDateTime, Document doc) {
+        // RFC 3501 SENTBEFORE/SENTON/SENTSINCE: a day is the header's own date, disregarding time and timezone
+        Date ownDate = Date.from(sentDateTime.toLocalDateTime().toInstant(ZoneOffset.UTC));
+        Date sentDate = Date.from(sentDateTime.toInstant());
+        doc.add(new StringField(SENT_DATE_FIELD_YEAR_RESOLUTION, DateTools.dateToString(ownDate, DateTools.Resolution.YEAR), Field.Store.NO));
+        doc.add(new StringField(SENT_DATE_FIELD_MONTH_RESOLUTION, DateTools.dateToString(ownDate, DateTools.Resolution.MONTH), Field.Store.NO));
+        doc.add(new StringField(SENT_DATE_FIELD_DAY_RESOLUTION, DateTools.dateToString(ownDate, DateTools.Resolution.DAY), Field.Store.NO));
         doc.add(new StringField(SENT_DATE_FIELD_HOUR_RESOLUTION, DateTools.dateToString(sentDate, DateTools.Resolution.HOUR), Field.Store.NO));
         doc.add(new StringField(SENT_DATE_FIELD_MINUTE_RESOLUTION, DateTools.dateToString(sentDate, DateTools.Resolution.MINUTE), Field.Store.NO));
         doc.add(new StringField(SENT_DATE_FIELD_SECOND_RESOLUTION, DateTools.dateToString(sentDate, DateTools.Resolution.SECOND), Field.Store.NO));

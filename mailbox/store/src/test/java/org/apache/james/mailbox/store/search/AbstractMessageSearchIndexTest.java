@@ -973,6 +973,54 @@ public abstract class AbstractMessageSearchIndexTest {
             .containsOnly(atFive.getUid());
     }
 
+    @Test
+    void sentDateOnShouldCompareTheDateHeaderOwnDate() throws Exception {
+        MessageManager messageManager = midnightMailbox();
+        ComposedMessageId midnightInAthens = appendSent(messageManager, "Sun, 25 Mar 2007 00:00:00 +0200");
+        appendSent(messageManager, "Sat, 24 Mar 2007 23:00:00 -0300");
+        awaitMessageCount(ImmutableList.of(), SearchQuery.matchAll(), 15);
+
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.headerDateOn("Date",
+            Date.from(Instant.parse("2007-03-25T00:00:00Z")), DateResolution.Day));
+
+        assertThat(Flux.from(messageManager.search(searchQuery, session)).toStream())
+            .containsOnly(midnightInAthens.getUid());
+    }
+
+    @Test
+    void sentDateBeforeShouldCompareTheDateHeaderOwnDate() throws Exception {
+        MessageManager messageManager = midnightMailbox();
+        appendSent(messageManager, "Sun, 25 Mar 2007 00:00:00 +0200");
+        ComposedMessageId lateInBrasilia = appendSent(messageManager, "Sat, 24 Mar 2007 23:00:00 -0300");
+        awaitMessageCount(ImmutableList.of(), SearchQuery.matchAll(), 15);
+
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.headerDateBefore("Date",
+            Date.from(Instant.parse("2007-03-25T00:00:00Z")), DateResolution.Day));
+
+        assertThat(Flux.from(messageManager.search(searchQuery, session)).toStream())
+            .containsOnly(lateInBrasilia.getUid());
+    }
+
+    @Test
+    void sentDateAfterShouldCompareTheDateHeaderOwnDate() throws Exception {
+        MessageManager messageManager = midnightMailbox();
+        ComposedMessageId midnightInAthens = appendSent(messageManager, "Sun, 25 Mar 2007 00:00:00 +0200");
+        appendSent(messageManager, "Sat, 24 Mar 2007 23:00:00 -0300");
+        awaitMessageCount(ImmutableList.of(), SearchQuery.matchAll(), 15);
+
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.headerDateAfter("Date",
+            Date.from(Instant.parse("2007-03-24T00:00:00Z")), DateResolution.Day));
+
+        assertThat(Flux.from(messageManager.search(searchQuery, session)).toStream())
+            .containsOnly(midnightInAthens.getUid());
+    }
+
+    private ComposedMessageId appendSent(MessageManager messageManager, String dateHeader) throws Exception {
+        return messageManager.appendMessage(MessageManager.AppendCommand.builder()
+            .build("Date: " + dateHeader + "\r\nSubject: test\r\n\r\ntestmail\r\n"),
+            session).getId();
+    }
+
     private MessageManager midnightMailbox() throws Exception {
         MailboxPath mailboxPath = MailboxPath.forUser(USERNAME, "midnight");
         storeMailboxManager.createMailbox(mailboxPath, session);

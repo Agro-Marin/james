@@ -467,6 +467,28 @@ class LuceneMailboxMessageSearchIndexTest {
     }
 
     @Test
+    void sentDateOnShouldCompareTheDateHeaderOwnDate() throws Exception {
+        Mailbox athens = new Mailbox(MailboxPath.forUser(BOB, "athens"), UidValidity.of(20), TestId.of(3));
+        MessageUid midnightInAthens = MessageUid.of(6);
+        MessageUid lateInBrasilia = MessageUid.of(7);
+        index.add(session, athens, new MessageBuilder()
+            .header("Date", "Sun, 25 Mar 2007 00:00:00 +0200")
+            .mailboxId(TestId.of(3))
+            .uid(midnightInAthens)
+            .build(factory.generate())).block();
+        index.add(session, athens, new MessageBuilder()
+            .header("Date", "Sat, 24 Mar 2007 23:00:00 -0300")
+            .mailboxId(TestId.of(3))
+            .uid(lateInBrasilia)
+            .build(factory.generate())).block();
+
+        SearchQuery query = SearchQuery.of(SearchQuery.headerDateOn("Date",
+            Date.from(Instant.parse("2007-03-25T00:00:00Z")), DateResolution.Day));
+
+        assertThat(index.search(session, athens, query).toStream()).containsExactly(midnightInAthens);
+    }
+
+    @Test
     void internalDateOnShouldMatch() throws Exception {
         Calendar cal = Calendar.getInstance();
         cal.setTime(new Date());

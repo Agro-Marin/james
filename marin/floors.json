@@ -1,7 +1,7 @@
 {
   "imaptest_scripted": {
     "base": [
-      52,
+      47,
       459
     ],
     "extensions": [
@@ -48,7 +48,6 @@
       "search-date command 16/29",
       "search-date command 18/29",
       "search-date command 19/29",
-      "search-date command 2/29",
       "search-date command 20/29",
       "search-date command 21/29",
       "search-date command 22/29",
@@ -57,10 +56,6 @@
       "search-date command 26/29",
       "search-date command 27/29",
       "search-date command 28/29",
-      "search-date command 3/29",
-      "search-date command 6/29",
-      "search-date command 7/29",
-      "search-date command 8/29",
       "search-date command 9/29",
       "search-sets command 12/24",
       "search-sets command 13/24",
@@ -86,7 +81,7 @@
     "junit": {
       "mailbox/lucene": {
         "skipped": 0,
-        "tests": 97
+        "tests": 98
       },
       "mailbox/memory": {
         "skipped": 12,
@@ -94,7 +89,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 111
+        "tests": 114
       },
       "mailbox/store": {
         "skipped": 0,
@@ -170,7 +165,7 @@
     "tz-America_Mexico_City": {
       "mailbox/lucene": {
         "skipped": 0,
-        "tests": 97
+        "tests": 98
       },
       "mailbox/memory": {
         "skipped": 12,
@@ -178,7 +173,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 111
+        "tests": 114
       },
       "mailbox/store": {
         "skipped": 0,
@@ -194,7 +189,7 @@
     "tz-America_Monterrey": {
       "mailbox/lucene": {
         "skipped": 0,
-        "tests": 97
+        "tests": 98
       },
       "mailbox/memory": {
         "skipped": 12,
@@ -202,7 +197,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 111
+        "tests": 114
       },
       "mailbox/store": {
         "skipped": 0,
@@ -240,7 +235,7 @@
     "listext": "not analysed yet; phase 2 analyses it before fixing",
     "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest": "needs Docker (a Tika container for attachment text); the lane has none",
     "move": "not analysed yet; phase 2 analyses it before fixing",
-    "search-date": "proof 3.3: SENTBEFORE/SENTSINCE/SENTON compare in GMT, not by the Date: header's own date (RFC 3501); phase 2",
+    "search-date": "a search narrowed by a sequence set fetches messages without their headers on PostgreSQL, so SENT* inside 1:7 matches nothing; phase 2",
     "search-sets": "not analysed yet; phase 2 analyses it before fixing",
     "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest": "needs Docker (a mock SMTP server container); the lane has none",
     "subscribe": "not analysed yet; phase 2 analyses it before fixing"

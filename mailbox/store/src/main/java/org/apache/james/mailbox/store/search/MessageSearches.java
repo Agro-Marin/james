@@ -22,18 +22,17 @@ package org.apache.james.mailbox.store.search;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.TimeZone;
 import java.util.stream.Stream;
 
 import jakarta.mail.Flags;
@@ -465,7 +464,7 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
                 return false;
             } else {
                 try {
-                    Date isoFieldValue = toISODate(value);
+                    Date isoFieldValue = headerDate(value, res);
                     SearchQuery.DateComparator type = operator.getType();
                     switch (type) {
                     case AFTER:
@@ -497,14 +496,16 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
         return null;
     }
 
-    private Date toISODate(String value) throws ParseException {
-        StringReader reader = new StringReader(value);
-        DateTime dateTime = new DateTimeParser(reader).parseAll();
-        Calendar cal = getGMT(dateTime.getTimeZone());
-        cal.set(dateTime.getYear(), dateTime.getMonth() - 1, dateTime.getDay(), dateTime.getHour(),
-                dateTime.getMinute(), dateTime.getSecond());
-        cal.set(Calendar.MILLISECOND, 0);
-        return cal.getTime();
+    private Date headerDate(String value, DateResolution dateResolution) throws ParseException {
+        DateTime dateTime = new DateTimeParser(new StringReader(value)).parseAll();
+        LocalDateTime wallClock = LocalDateTime.of(dateTime.getYear(), dateTime.getMonth(), dateTime.getDay(),
+            dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
+        // RFC 3501 SENTBEFORE/SENTON/SENTSINCE: a day is the header's own date, disregarding time and timezone
+        ZoneOffset offset = switch (dateResolution) {
+            case Year, Month, Day -> ZoneOffset.UTC;
+            case Hour, Minute, Second -> ZoneOffset.ofHoursMinutes(dateTime.getTimeZone() / 100, dateTime.getTimeZone() % 100);
+        };
+        return Date.from(wallClock.toInstant(offset));
     }
 
 
@@ -639,8 +640,5 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
         };
     }
 
-    private Calendar getGMT(int timeZone) {
-        return Calendar.getInstance(TimeZone.getTimeZone(String.format("GMT%+04d", timeZone)), Locale.ENGLISH);
-    }
 
 }
