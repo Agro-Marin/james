@@ -44,6 +44,7 @@ import org.apache.james.mailbox.model.ComposedMessageIdWithMetaData;
 import org.apache.james.mailbox.model.Mailbox;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageId;
+import org.apache.james.mailbox.model.MessageMetaData;
 import org.apache.james.mailbox.model.UpdatedFlags;
 import org.apache.james.mailbox.postgres.PostgresMailboxId;
 import org.apache.james.mailbox.postgres.PostgresMessageId;
@@ -54,6 +55,8 @@ import org.apache.james.mailbox.store.FlagsUpdateCalculator;
 import org.apache.james.mailbox.store.MailboxReactorUtils;
 import org.apache.james.mailbox.store.mail.MessageIdMapper;
 import org.apache.james.mailbox.store.mail.MessageMapper;
+import org.apache.james.mailbox.store.mail.ModSeqProvider;
+import org.apache.james.mailbox.store.mail.UidProvider;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
 import org.apache.james.mailbox.store.mail.model.impl.SimpleMailboxMessage;
 import org.apache.james.util.ReactorUtils;
@@ -168,6 +171,20 @@ public class PostgresMessageIdMapper implements MessageIdMapper {
         PostgresMailboxId mailboxId = (PostgresMailboxId) mailbox.getMailboxId();
         return mailboxMessageDAO.insert(mailboxMessage, mailboxId)
             .onErrorResume(PostgresUtils.UNIQUE_CONSTRAINT_VIOLATION_PREDICATE, e -> Mono.empty());
+    }
+
+    @Override
+    public Mono<MessageMetaData> copyInMailboxWithNewUidReactive(MailboxMessage mailboxMessage, Mailbox mailbox,
+                                                                 UidProvider uidProvider, ModSeqProvider modSeqProvider) {
+        mailboxMessage.setSaveDate(Date.from(clock.instant()));
+        PostgresMailboxId mailboxId = (PostgresMailboxId) mailbox.getMailboxId();
+        return mailboxMessageDAO.insertWithNextUidAndModSeq(mailboxMessage, mailboxId)
+            .switchIfEmpty(Mono.error(() -> new MailboxNotFoundException(mailboxId)))
+            .map(uidAndModSeq -> {
+                mailboxMessage.setUid(uidAndModSeq.getLeft());
+                mailboxMessage.setModSeq(uidAndModSeq.getRight());
+                return mailboxMessage.metaData();
+            });
     }
 
     @Override

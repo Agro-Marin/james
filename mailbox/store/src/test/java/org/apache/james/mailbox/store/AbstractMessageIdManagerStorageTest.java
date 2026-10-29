@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
@@ -51,7 +52,9 @@ import org.apache.james.mailbox.model.MailboxACL.Rfc4314Rights;
 import org.apache.james.mailbox.model.MailboxACL.Right;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageId;
+import org.apache.james.mailbox.model.MessageRange;
 import org.apache.james.mailbox.model.MessageResult;
+import org.apache.james.util.concurrency.ConcurrentTestRunner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -151,6 +154,33 @@ public abstract class AbstractMessageIdManagerStorageTest {
         return IntStream.rangeClosed(1, count)
             .mapToObj(uid -> testingData.persist(aliceMailbox1.getMailboxId(), MessageUid.of(uid), FLAGS, aliceSession))
             .collect(ImmutableList.toImmutableList());
+    }
+
+    @Test
+    void concurrentAdditionsToAMailboxShouldBecomeVisibleInUidOrder() throws Exception {
+        int threadCount = 32;
+        int operationCount = 25;
+        List<MessageId> messageIds = persistAliceMessages(threadCount * operationCount);
+        MessageManager target = testingData.getMailboxManager().getMailbox(aliceMailbox2.getMailboxId(), aliceSession);
+        List<String> gaps = new CopyOnWriteArrayList<>();
+        ConcurrentTestRunner.builder()
+            .operation((threadNumber, step) -> {
+                messageIdManager.setInMailboxes(messageIds.get(threadNumber * operationCount + step),
+                    ImmutableList.of(aliceMailbox1.getMailboxId(), aliceMailbox2.getMailboxId()), aliceSession);
+                List<MessageUid> uids = Flux.from(target.listMessagesMetadata(MessageRange.all(), aliceSession))
+                    .map(metadata -> metadata.getComposedMessageId().getUid())
+                    .collectSortedList()
+                    .block();
+                MessageUid highest = uids.get(uids.size() - 1);
+                if (highest.asLong() != uids.size()) {
+                    gaps.add(uids.size() + " messages visible up to UID " + highest.asLong());
+                }
+            })
+            .threadCount(threadCount)
+            .operationCount(operationCount)
+            .runSuccessfullyWithin(Duration.ofMinutes(2));
+
+        assertThat(gaps).isEmpty();
     }
 
     @Test

@@ -553,16 +553,9 @@ public class StoreMessageIdManager implements MessageIdManager {
 
     private Mono<MessageMetaData> save(MessageIdMapper messageIdMapper, MailboxMessage mailboxMessage,
                                        Mailbox mailbox, MailboxSession mailboxSession) {
-        return Mono.zip(
-                mailboxSessionMapperFactory.getModSeqProvider(mailboxSession).nextModSeqReactive(mailbox.getMailboxId()),
-                mailboxSessionMapperFactory.getUidProvider(mailboxSession).nextUidReactive(mailbox.getMailboxId()))
-            .flatMap(modSeqAndUid -> {
-                mailboxMessage.setModSeq(modSeqAndUid.getT1());
-                mailboxMessage.setUid(modSeqAndUid.getT2());
-
-                return messageIdMapper.copyInMailboxReactive(mailboxMessage, mailbox)
-                    .thenReturn(mailboxMessage.metaData());
-            });
+        return messageIdMapper.copyInMailboxWithNewUidReactive(mailboxMessage, mailbox,
+            mailboxSessionMapperFactory.getUidProvider(mailboxSession),
+            mailboxSessionMapperFactory.getModSeqProvider(mailboxSession));
     }
 
     private ThrowingFunction<MailboxMessage, MessageResult> messageResultConverter(FetchGroup fetchGroup) {

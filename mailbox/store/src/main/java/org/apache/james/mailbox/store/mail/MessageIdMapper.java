@@ -30,6 +30,7 @@ import org.apache.james.mailbox.model.ComposedMessageIdWithMetaData;
 import org.apache.james.mailbox.model.Mailbox;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageId;
+import org.apache.james.mailbox.model.MessageMetaData;
 import org.apache.james.mailbox.model.UpdatedFlags;
 import org.apache.james.mailbox.store.mail.MessageMapper.FetchType;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
@@ -63,6 +64,18 @@ public interface MessageIdMapper {
     default Mono<Void> copyInMailboxReactive(MailboxMessage mailboxMessage, Mailbox mailbox) {
         return Mono.<Void>fromRunnable(Throwing.runnable(() -> copyInMailbox(mailboxMessage, mailbox)).sneakyThrow())
             .subscribeOn(ReactorUtils.BLOCKING_CALL_WRAPPER);
+    }
+
+    // A backend whose UIDs could become visible out of order overrides this to take them with the copy.
+    default Mono<MessageMetaData> copyInMailboxWithNewUidReactive(MailboxMessage mailboxMessage, Mailbox mailbox,
+                                                                  UidProvider uidProvider, ModSeqProvider modSeqProvider) {
+        return Mono.zip(modSeqProvider.nextModSeqReactive(mailbox.getMailboxId()), uidProvider.nextUidReactive(mailbox.getMailboxId()))
+            .flatMap(modSeqAndUid -> {
+                mailboxMessage.setModSeq(modSeqAndUid.getT1());
+                mailboxMessage.setUid(modSeqAndUid.getT2());
+                return copyInMailboxReactive(mailboxMessage, mailbox)
+                    .then(Mono.fromCallable(mailboxMessage::metaData));
+            });
     }
 
     void delete(MessageId messageId);

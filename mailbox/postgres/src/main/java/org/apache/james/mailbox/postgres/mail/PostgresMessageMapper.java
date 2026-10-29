@@ -44,6 +44,7 @@ import org.apache.james.mailbox.FlagsBuilder;
 import org.apache.james.mailbox.MessageUid;
 import org.apache.james.mailbox.ModSeq;
 import org.apache.james.mailbox.exception.MailboxException;
+import org.apache.james.mailbox.exception.MailboxNotFoundException;
 import org.apache.james.mailbox.model.ComposedMessageId;
 import org.apache.james.mailbox.model.ComposedMessageIdWithMetaData;
 import org.apache.james.mailbox.model.Mailbox;
@@ -53,7 +54,6 @@ import org.apache.james.mailbox.model.MessageRange;
 import org.apache.james.mailbox.model.UpdatedFlags;
 import org.apache.james.mailbox.postgres.PostgresMailboxId;
 import org.apache.james.mailbox.postgres.mail.dao.PostgresAttachmentDAO;
-import org.apache.james.mailbox.postgres.mail.dao.PostgresMailboxDAO;
 import org.apache.james.mailbox.postgres.mail.dao.PostgresMailboxMessageDAO;
 import org.apache.james.mailbox.postgres.mail.dao.PostgresMessageDAO;
 import org.apache.james.mailbox.store.FlagsUpdateCalculator;
@@ -91,7 +91,6 @@ public class PostgresMessageMapper implements MessageMapper {
 
     private final PostgresMessageDAO messageDAO;
     private final PostgresMailboxMessageDAO mailboxMessageDAO;
-    private final PostgresMailboxDAO mailboxDAO;
     private final PostgresModSeqProvider modSeqProvider;
     private final PostgresUidProvider uidProvider;
     private final BlobStore blobStore;
@@ -107,7 +106,6 @@ public class PostgresMessageMapper implements MessageMapper {
                                  AttachmentIdAssignationStrategy attachmentIdAssignationStrategy) {
         this.messageDAO = new PostgresMessageDAO(postgresExecutor, blobIdFactory);
         this.mailboxMessageDAO = new PostgresMailboxMessageDAO(postgresExecutor);
-        this.mailboxDAO = new PostgresMailboxDAO(postgresExecutor);
         this.modSeqProvider = modSeqProvider;
         this.uidProvider = uidProvider;
         this.blobStore = blobStore;
@@ -256,11 +254,10 @@ public class PostgresMessageMapper implements MessageMapper {
                 message.setSaveDate(Date.from(clock.instant()));
                 return message;
             })
-            .flatMap(this::setNewUidAndModSeq)
             .then(saveBodyContent(message)
                 .flatMap(bodyBlobId -> messageDAO.insert(message, bodyBlobId.asString())
                     .onErrorResume(PostgresUtils.UNIQUE_CONSTRAINT_VIOLATION_PREDICATE, e -> Mono.empty())))
-            .then(Mono.defer(() -> mailboxMessageDAO.insert(message)))
+            .then(Mono.defer(() -> insertWithNewUidAndModSeq(message)))
             .then(Mono.fromCallable(message::metaData));
     }
 
@@ -370,14 +367,15 @@ public class PostgresMessageMapper implements MessageMapper {
         return copyReactive(mailbox, original).block();
     }
 
-    private Mono<Void> setNewUidAndModSeq(MailboxMessage mailboxMessage) {
-        return mailboxDAO.incrementAndGetLastUidAndModSeq(mailboxMessage.getMailboxId())
-            .defaultIfEmpty(Pair.of(MessageUid.MIN_VALUE, ModSeq.first()))
-            .map(pair -> {
-                mailboxMessage.setUid(pair.getLeft());
-                mailboxMessage.setModSeq(pair.getRight());
-                return pair;
-            }).then();
+    private Mono<Void> insertWithNewUidAndModSeq(MailboxMessage mailboxMessage) {
+        PostgresMailboxId mailboxId = (PostgresMailboxId) mailboxMessage.getMailboxId();
+        return mailboxMessageDAO.insertWithNextUidAndModSeq(mailboxMessage, mailboxId)
+            .switchIfEmpty(Mono.error(() -> new MailboxNotFoundException(mailboxId)))
+            .doOnNext(uidAndModSeq -> {
+                mailboxMessage.setUid(uidAndModSeq.getLeft());
+                mailboxMessage.setModSeq(uidAndModSeq.getRight());
+            })
+            .then();
     }
 
 
@@ -389,10 +387,8 @@ public class PostgresMessageMapper implements MessageMapper {
                 copiedMessage.setSaveDate(Date.from(clock.instant()));
                 return copiedMessage;
             })
-            .flatMap(copiedMessage -> setNewUidAndModSeq(copiedMessage)
-                .then(Mono.defer(() -> mailboxMessageDAO.insert(copiedMessage))
-                    .thenReturn(copiedMessage))
-                .map(MailboxMessage::metaData));
+            .flatMap(copiedMessage -> insertWithNewUidAndModSeq(copiedMessage)
+                .then(Mono.fromCallable(copiedMessage::metaData)));
     }
 
 

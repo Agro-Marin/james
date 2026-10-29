@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
@@ -70,12 +71,34 @@ public class InMemoryMessageMapper extends AbstractMessageMapper {
     }
 
     private Map<MessageUid, MailboxMessage> getMembershipByUidForId(InMemoryId id) {
-        Map<MessageUid, MailboxMessage> membershipByUid = mailboxByUid.get(id);
-        if (membershipByUid == null) {
-            membershipByUid = new ConcurrentHashMap<>(INITIAL_SIZE);
-            mailboxByUid.put(id, membershipByUid);
+        return mailboxByUid.computeIfAbsent(id, any -> new ConcurrentHashMap<>(INITIAL_SIZE));
+    }
+
+    // Taking the UID and storing under the mailbox's lock makes concurrent adds visible in UID order.
+    @Override
+    public MessageMetaData add(Mailbox mailbox, MailboxMessage message) throws MailboxException {
+        synchronized (getMembershipByUidForMailbox(mailbox)) {
+            return super.add(mailbox, message);
         }
-        return membershipByUid;
+    }
+
+    @Override
+    public MessageMetaData copy(Mailbox mailbox, MailboxMessage original) throws MailboxException {
+        synchronized (getMembershipByUidForMailbox(mailbox)) {
+            return super.copy(mailbox, original);
+        }
+    }
+
+    Optional<MessageMetaData> addUnlessInMailbox(Mailbox mailbox, MailboxMessage message) throws MailboxException {
+        Map<MessageUid, MailboxMessage> membershipByUid = getMembershipByUidForMailbox(mailbox);
+        synchronized (membershipByUid) {
+            boolean isAlreadyInMailbox = membershipByUid.values().stream()
+                .anyMatch(member -> member.getMessageId().equals(message.getMessageId()));
+            if (isAlreadyInMailbox) {
+                return Optional.empty();
+            }
+            return Optional.of(super.add(mailbox, message));
+        }
     }
 
     @Override

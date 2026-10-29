@@ -298,14 +298,4 @@ public class PostgresMailboxDAO {
             .map(ModSeq::of);
     }
 
-    public Mono<Pair<MessageUid, ModSeq>> incrementAndGetLastUidAndModSeq(MailboxId mailboxId) {
-        int increment = 1;
-        return postgresExecutor.executeRow(dsl -> Mono.from(dsl.update(TABLE_NAME)
-                .set(MAILBOX_LAST_UID, coalesce(MAILBOX_LAST_UID, 0L).add(increment))
-                .set(MAILBOX_HIGHEST_MODSEQ, coalesce(MAILBOX_HIGHEST_MODSEQ, 0L).add(increment))
-                .where(MAILBOX_ID.eq(asUUID(mailboxId)))
-                .returning(MAILBOX_LAST_UID, MAILBOX_HIGHEST_MODSEQ)))
-            .map(record -> Pair.of(MessageUid.of(record.get(MAILBOX_LAST_UID)), ModSeq.of(record.get(MAILBOX_HIGHEST_MODSEQ))));
-    }
-
 }

@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import jakarta.mail.Flags;
 import jakarta.mail.Flags.Flag;
@@ -957,6 +958,46 @@ public abstract class MessageMapperTest {
             FetchType.METADATA, 1);
         assertThat(messages.hasNext()).isTrue();
         assertThat(messages.next().createFlags().getUserFlags()).hasSize(threadCount * updateCount);
+    }
+
+    @Test
+    void concurrentAddsShouldBecomeVisibleInUidOrder() throws Exception {
+        List<String> gaps = new CopyOnWriteArrayList<>();
+        ConcurrentTestRunner.builder()
+            .operation((threadNumber, step) -> {
+                messageMapper.add(benwaInboxMailbox, createMessage(benwaInboxMailbox, mapperProvider.generateMessageId(),
+                    "Subject: concurrent " + threadNumber + "-" + step + "\r\n\r\nBody\n", BODY_START));
+                recordGap(benwaInboxMailbox, gaps);
+            })
+            .threadCount(32)
+            .operationCount(50)
+            .runSuccessfullyWithin(Duration.ofMinutes(1));
+
+        assertThat(gaps).isEmpty();
+    }
+
+    @Test
+    void concurrentCopiesShouldBecomeVisibleInUidOrder() throws Exception {
+        saveMessages();
+        List<String> gaps = new CopyOnWriteArrayList<>();
+        ConcurrentTestRunner.builder()
+            .operation((threadNumber, step) -> {
+                messageMapper.copy(benwaWorkMailbox, message1);
+                recordGap(benwaWorkMailbox, gaps);
+            })
+            .threadCount(32)
+            .operationCount(50)
+            .runSuccessfullyWithin(Duration.ofMinutes(1));
+
+        assertThat(gaps).isEmpty();
+    }
+
+    private void recordGap(Mailbox mailbox, List<String> gaps) {
+        List<MessageUid> uids = messageMapper.listAllMessageUids(mailbox).collectSortedList().block();
+        MessageUid highest = uids.get(uids.size() - 1);
+        if (highest.asLong() != uids.size()) {
+            gaps.add(uids.size() + " messages visible up to UID " + highest.asLong());
+        }
     }
 
     @Test

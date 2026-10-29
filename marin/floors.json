@@ -78,15 +78,15 @@
     "Keyword in PERMANENTFLAGS not introduced with FLAGS": 5,
     "Keyword used without being in FLAGS": 340,
     "Message UID=N has \\Recent flag in multiple sessions": 5,
-    "UID changed for sequence N": 5,
-    "seq too high (N > N, state=APPEND)": 110,
+    "UID changed for sequence N": 0,
+    "seq too high (N > N, state=APPEND)": 190,
     "seq too high (N > N, state=EXPUNGE)": 50
   },
   "junit": {
     "junit": {
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 664
+        "tests": 667
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -148,7 +148,7 @@
       },
       "mailbox/postgres": {
         "skipped": 12,
-        "tests": 777
+        "tests": 780
       },
       "mpt/impl/imap-mailbox/postgres": {
         "skipped": 0,
@@ -166,7 +166,7 @@
     "tz-America_Mexico_City": {
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 664
+        "tests": 667
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -186,7 +186,7 @@
     "tz-America_Monterrey": {
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 664
+        "tests": 667
       },
       "mailbox/scanning-search": {
         "skipped": 2,

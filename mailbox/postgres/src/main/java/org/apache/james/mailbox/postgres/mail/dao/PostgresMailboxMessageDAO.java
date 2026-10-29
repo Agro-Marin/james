@@ -25,6 +25,8 @@ import static org.apache.james.backends.postgres.PostgresCommons.LOCAL_DATE_TIME
 import static org.apache.james.backends.postgres.PostgresCommons.UNNEST_FIELD;
 import static org.apache.james.backends.postgres.PostgresCommons.tableField;
 import static org.apache.james.backends.postgres.utils.PostgresExecutor.EAGER_FETCH;
+import static org.apache.james.mailbox.postgres.mail.PostgresMailboxDataDefinition.PostgresMailboxTable.MAILBOX_HIGHEST_MODSEQ;
+import static org.apache.james.mailbox.postgres.mail.PostgresMailboxDataDefinition.PostgresMailboxTable.MAILBOX_LAST_UID;
 import static org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition.MessageTable.INTERNAL_DATE;
 import static org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition.MessageTable.SIZE;
 import static org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition.MessageToMailboxTable.IS_ANSWERED;
@@ -49,6 +51,7 @@ import static org.apache.james.mailbox.postgres.mail.dao.PostgresMailboxMessageD
 import static org.apache.james.mailbox.postgres.mail.dao.PostgresMailboxMessageDAOUtils.RECORD_TO_FLAGS_FUNCTION;
 import static org.apache.james.mailbox.postgres.mail.dao.PostgresMailboxMessageDAOUtils.RECORD_TO_MESSAGE_METADATA_FUNCTION;
 import static org.apache.james.mailbox.postgres.mail.dao.PostgresMailboxMessageDAOUtils.RECORD_TO_MESSAGE_UID_FUNCTION;
+import static org.jooq.impl.DSL.coalesce;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -73,6 +76,7 @@ import org.apache.james.mailbox.model.MessageMetaData;
 import org.apache.james.mailbox.model.MessageRange;
 import org.apache.james.mailbox.postgres.PostgresMailboxId;
 import org.apache.james.mailbox.postgres.PostgresMessageId;
+import org.apache.james.mailbox.postgres.mail.PostgresMailboxDataDefinition.PostgresMailboxTable;
 import org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition.MessageTable;
 import org.apache.james.mailbox.store.StoreMessageManager;
 import org.apache.james.mailbox.store.mail.MessageMapper;
@@ -80,6 +84,7 @@ import org.apache.james.mailbox.store.mail.MessageMapper.FetchType;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
 import org.apache.james.mailbox.store.mail.model.impl.SimpleMailboxMessage;
 import org.apache.james.util.streams.Limit;
+import org.jooq.CommonTableExpression;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Name;
@@ -523,6 +528,38 @@ public class PostgresMailboxMessageDAO {
             .set(IS_SEEN, mailboxMessage.isSeen())
             .set(USER_FLAGS, mailboxMessage.createFlags().getUserFlags())
             .set(SAVE_DATE, mailboxMessage.getSaveDate().map(DATE_TO_LOCAL_DATE_TIME).orElse(null))));
+    }
+
+    // One statement: the mailbox row stays locked until the insert commits, so concurrent inserts become visible in UID order.
+    public Mono<Pair<MessageUid, ModSeq>> insertWithNextUidAndModSeq(MailboxMessage mailboxMessage, PostgresMailboxId mailboxId) {
+        return postgresExecutor.executeRow(dslContext -> {
+                CommonTableExpression<Record> next = DSL.name("next_uid_and_modseq").as(dslContext.update(PostgresMailboxTable.TABLE_NAME)
+                    .set(MAILBOX_LAST_UID, coalesce(MAILBOX_LAST_UID, 0L).add(1))
+                    .set(MAILBOX_HIGHEST_MODSEQ, coalesce(MAILBOX_HIGHEST_MODSEQ, 0L).add(1))
+                    .where(PostgresMailboxTable.MAILBOX_ID.eq(mailboxId.asUuid()))
+                    .returning(MAILBOX_LAST_UID, MAILBOX_HIGHEST_MODSEQ));
+                return Mono.from(dslContext.with(next)
+                    .insertInto(TABLE_NAME, MAILBOX_ID, MESSAGE_UID, MOD_SEQ, MESSAGE_ID, THREAD_ID, INTERNAL_DATE, SIZE,
+                        IS_DELETED, IS_ANSWERED, IS_DRAFT, IS_FLAGGED, IS_RECENT, IS_SEEN, USER_FLAGS, SAVE_DATE)
+                    .select(DSL.select(DSL.val(mailboxId.asUuid(), MAILBOX_ID),
+                            next.field(MAILBOX_LAST_UID),
+                            next.field(MAILBOX_HIGHEST_MODSEQ),
+                            DSL.val(((PostgresMessageId) mailboxMessage.getMessageId()).asUuid(), MESSAGE_ID),
+                            DSL.val(((PostgresMessageId) mailboxMessage.getThreadId().getBaseMessageId()).asUuid(), THREAD_ID),
+                            DSL.val(DATE_TO_LOCAL_DATE_TIME.apply(mailboxMessage.getInternalDate()), INTERNAL_DATE),
+                            DSL.val(mailboxMessage.getFullContentOctets(), SIZE),
+                            DSL.val(mailboxMessage.isDeleted(), IS_DELETED),
+                            DSL.val(mailboxMessage.isAnswered(), IS_ANSWERED),
+                            DSL.val(mailboxMessage.isDraft(), IS_DRAFT),
+                            DSL.val(mailboxMessage.isFlagged(), IS_FLAGGED),
+                            DSL.val(mailboxMessage.isRecent(), IS_RECENT),
+                            DSL.val(mailboxMessage.isSeen(), IS_SEEN),
+                            DSL.val(mailboxMessage.createFlags().getUserFlags(), USER_FLAGS),
+                            DSL.val(mailboxMessage.getSaveDate().map(DATE_TO_LOCAL_DATE_TIME).orElse(null), SAVE_DATE))
+                        .from(next))
+                    .returning(MESSAGE_UID, MOD_SEQ));
+            })
+            .map(record -> Pair.of(MessageUid.of(record.get(MESSAGE_UID)), ModSeq.of(record.get(MOD_SEQ))));
     }
 
     public Flux<MailboxId> findMailboxes(PostgresMessageId messageId) {

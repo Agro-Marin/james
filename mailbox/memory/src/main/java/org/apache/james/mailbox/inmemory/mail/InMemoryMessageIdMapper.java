@@ -36,6 +36,7 @@ import org.apache.james.mailbox.model.ComposedMessageIdWithMetaData;
 import org.apache.james.mailbox.model.Mailbox;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageId;
+import org.apache.james.mailbox.model.MessageMetaData;
 import org.apache.james.mailbox.model.MessageRange;
 import org.apache.james.mailbox.model.UpdatedFlags;
 import org.apache.james.mailbox.store.FlagsUpdateCalculator;
@@ -43,6 +44,8 @@ import org.apache.james.mailbox.store.MailboxReactorUtils;
 import org.apache.james.mailbox.store.mail.MailboxMapper;
 import org.apache.james.mailbox.store.mail.MessageIdMapper;
 import org.apache.james.mailbox.store.mail.MessageMapper;
+import org.apache.james.mailbox.store.mail.ModSeqProvider;
+import org.apache.james.mailbox.store.mail.UidProvider;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
 import org.reactivestreams.Publisher;
 
@@ -115,6 +118,13 @@ public class InMemoryMessageIdMapper implements MessageIdMapper {
         if (!isAlreadyInMailbox) {
             save(mailboxMessage);
         }
+    }
+
+    @Override
+    public Mono<MessageMetaData> copyInMailboxWithNewUidReactive(MailboxMessage mailboxMessage, Mailbox mailbox,
+                                                                 UidProvider uidProvider, ModSeqProvider modSeqProvider) {
+        return Mono.fromCallable(() -> messageMapper.addUnlessInMailbox(mailbox, mailboxMessage))
+            .flatMap(Mono::justOrEmpty);
     }
 
     @Override
