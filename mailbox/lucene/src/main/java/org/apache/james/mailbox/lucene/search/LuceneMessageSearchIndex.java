@@ -60,7 +60,6 @@ import static org.apache.james.mailbox.lucene.search.LuceneIndexableDocument.cre
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.EnumSet;
@@ -159,18 +158,7 @@ public class LuceneMessageSearchIndex extends ListeningMessageSearchIndex {
 
     }
 
-    private static final Date MAX_DATE;
-    private static final Date MIN_DATE;
     public static final org.apache.james.events.Group GROUP = new LuceneMessageSearchIndexGroup();
-
-    static {
-        Calendar cal = Calendar.getInstance();
-        cal.set(9999, Calendar.DECEMBER, 31);
-        MAX_DATE = cal.getTime();
-
-        cal.set(0, Calendar.JANUARY, 1);
-        MIN_DATE = cal.getTime();
-    }
 
     /**
      * Default max queryBuilder results
@@ -519,8 +507,8 @@ public class LuceneMessageSearchIndex extends ListeningMessageSearchIndex {
         String value = DateTools.dateToString(date, dRes);
         return switch (dop.getType()) {
             case ON -> new TermQuery(new Term(field, value));
-            case BEFORE -> TermRangeQuery.newStringRange(field, DateTools.dateToString(MIN_DATE, dRes), value, INCLUDE_LOWER, !INCLUDE_UPPER);
-            case AFTER -> TermRangeQuery.newStringRange(field, value, DateTools.dateToString(MAX_DATE, dRes), !INCLUDE_LOWER, INCLUDE_UPPER);
+            case BEFORE -> TermRangeQuery.newStringRange(field, null, value, INCLUDE_LOWER, !INCLUDE_UPPER);
+            case AFTER -> TermRangeQuery.newStringRange(field, value, null, !INCLUDE_LOWER, INCLUDE_UPPER);
         };
     }
 

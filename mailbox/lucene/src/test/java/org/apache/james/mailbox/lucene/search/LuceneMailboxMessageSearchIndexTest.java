@@ -23,6 +23,7 @@ import static org.apache.james.mailbox.store.MessageIdManagerTestSystem.MOD_SEQ;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -450,6 +451,21 @@ class LuceneMailboxMessageSearchIndexTest {
     
     
     
+    @Test
+    void internalDateAfterShouldMatchTheLastSecondOfTheYear9999() throws Exception {
+        Mailbox endOfTime = new Mailbox(MailboxPath.forUser(BOB, "endOfTime"), UidValidity.of(20), TestId.of(3));
+        MessageUid uid = MessageUid.of(6);
+        index.add(session, endOfTime, new MessageBuilder()
+            .mailboxId(TestId.of(3))
+            .uid(uid)
+            .internalDate(Date.from(Instant.parse("9999-12-31T23:59:59Z")))
+            .build(factory.generate())).block();
+
+        SearchQuery query = SearchQuery.of(SearchQuery.internalDateAfter(new Date(), DateResolution.Second));
+
+        assertThat(index.search(session, endOfTime, query).toStream()).containsExactly(uid);
+    }
+
     @Test
     void internalDateOnShouldMatch() throws Exception {
         Calendar cal = Calendar.getInstance();

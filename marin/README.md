@@ -11,7 +11,7 @@ merge: an upstream fix is re-implemented by hand. The plan is `agromarin-knowled
 | Stage | What runs |
 |---|---|
 | `build` | `install` of the tested modules and `server/apps/postgres-app`, checkstyle on, JDK 21 |
-| `junit` | 14 modules that need no Docker, `TZ=UTC` |
+| `junit` | 15 modules, `TZ=UTC`; their two Docker-bound classes fail with that reason in `floors.json` |
 | `pg` | 5 PostgreSQL modules against a throwaway PostgreSQL 18 (`-Djames.postgres.external`), `TZ=UTC` |
 | `tz` | the date-sensitive modules again at America/Mexico_City and America/Monterrey |
 | `imap` | Dovecot's `imaptest` against the postgres-app: the scripted suite, then 10 clients for 60 s |

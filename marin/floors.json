@@ -84,6 +84,10 @@
   },
   "junit": {
     "junit": {
+      "mailbox/lucene": {
+        "skipped": 0,
+        "tests": 97
+      },
       "mailbox/memory": {
         "skipped": 12,
         "tests": 667
@@ -164,6 +168,10 @@
       }
     },
     "tz-America_Mexico_City": {
+      "mailbox/lucene": {
+        "skipped": 0,
+        "tests": 97
+      },
       "mailbox/memory": {
         "skipped": 12,
         "tests": 667
@@ -184,6 +192,10 @@
       }
     },
     "tz-America_Monterrey": {
+      "mailbox/lucene": {
+        "skipped": 0,
+        "tests": 97
+      },
       "mailbox/memory": {
         "skipped": 12,
         "tests": 667
@@ -206,12 +218,17 @@
   },
   "junit_failing": {
     "junit": [
+      "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest#",
       "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest#"
     ],
     "pg": [],
-    "tz-America_Mexico_City": [],
+    "tz-America_Mexico_City": [
+      "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest#"
+    ],
     "tz-America_Mexico_City-jmap": [],
-    "tz-America_Monterrey": [],
+    "tz-America_Monterrey": [
+      "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest#"
+    ],
     "tz-America_Monterrey-jmap": []
   },
   "reasons": {
@@ -221,21 +238,11 @@
     "fetch-body-message-rfc822-x2": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",
     "fetch-envelope": "not analysed yet; phase 2 analyses it before fixing",
     "listext": "not analysed yet; phase 2 analyses it before fixing",
+    "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest": "needs Docker (a Tika container for attachment text); the lane has none",
     "move": "not analysed yet; phase 2 analyses it before fixing",
     "search-date": "proof 3.3: SENTBEFORE/SENTSINCE/SENTON compare in GMT, not by the Date: header's own date (RFC 3501); phase 2",
     "search-sets": "not analysed yet; phase 2 analyses it before fixing",
     "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest": "needs Docker (a mock SMTP server container); the lane has none",
     "subscribe": "not analysed yet; phase 2 analyses it before fixing"
-  },
-  "time_dependent": {
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterSortedByReceivedAtShouldYieldExpectedResult(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterSortedByReceivedAtShouldYieldExpectedResultWithOffsetAndLimit(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterWithSortedByReceivedAtShouldAcceptSharedMailboxesWhenSharesExtension(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#inMailboxAfterWithSortedBySentAtShouldAcceptSharedMailboxesWhenSharesExtension(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#listMailsReceivedAfterADateShouldBeExclusive(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodNoViewTest#queryShouldTakeAllFiltersIntoAccount(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodTest#inMailboxAfterWithSortedBySentAtShouldAcceptSharedMailboxesWhenSharesExtension(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodTest#listMailsReceivedAfterADateShouldBeExclusive(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryEmailQueryMethodTest#queryShouldTakeAllFiltersIntoAccount(GuiceJamesServer)": "proof 3.2: JMAP date queries fail while the local date differs from the UTC date (18:00 to 24:00 in Monterrey); phase 2"
   }
 }

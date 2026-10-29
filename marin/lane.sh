@@ -26,7 +26,7 @@ done
 JUNIT_MODULES=(
     protocols/api protocols/imap protocols/smtp
     mailet/base mailet/standard
-    mailbox/store mailbox/memory mailbox/scanning-search
+    mailbox/store mailbox/memory mailbox/scanning-search mailbox/lucene
     server/protocols/protocols-smtp server/protocols/protocols-imap4 server/mailet/mailets
     server/protocols/jmap-rfc-8621
     server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests
@@ -37,7 +37,7 @@ PG_MODULES=(
     mailbox/postgres mpt/impl/imap-mailbox/postgres
 )
 TZ_ZONES=(America/Mexico_City America/Monterrey)
-TZ_MODULES=(mailbox/store mailbox/memory mailbox/scanning-search)
+TZ_MODULES=(mailbox/store mailbox/memory mailbox/scanning-search mailbox/lucene)
 TZ_JMAP=server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests
 TZ_JMAP_TESTS='MemoryEmailQueryMethodTest,MemoryEmailQueryMethodNoViewTest'
 

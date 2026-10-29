@@ -1,9 +1,8 @@
 """Counts a lane run and holds it to floors.json.
 
 JUnit counts (tests run, skipped) and imaptest's scripted results are exact in both directions, failing tests included:
-a test that starts or stops failing moves a floor, in the same commit. A test listed in "time_dependent" passes or
-fails with the wall clock, so either is accepted until its fix lands. Stress violations depend on how clients interleave, so each kind
-has a ceiling instead, set by hand; --update leaves those alone. Every failing test needs a reason in floors.json.
+a test that starts or stops failing moves a floor, in the same commit. Stress violations depend on how clients interleave,
+so each kind has a ceiling instead, set by hand; --update leaves those alone. Every failing test needs a reason in floors.json.
 """
 
 import argparse
@@ -95,7 +94,6 @@ def counted(modules):
 
 def compare(result, floors):
     problems = []
-    time_dependent = set(floors.get("time_dependent", {}))
     for stage, modules in result["junit"].items():
         expected = floors.get("junit", {}).get(stage)
         if expected is None:
@@ -105,8 +103,8 @@ def compare(result, floors):
         for module in sorted(set(modules) | set(expected)):
             if modules.get(module) != expected.get(module):
                 problems.append(f"junit {stage} {module}: {expected.get(module)} -> {modules.get(module)}")
-        was = set(floors.get("junit_failing", {}).get(stage, [])) - time_dependent
-        now = set(result["junit_failing"][stage]) - time_dependent
+        was = set(floors.get("junit_failing", {}).get(stage, []))
+        now = set(result["junit_failing"][stage])
         problems += [f"junit {stage}: now fails {t}" for t in sorted(now - was)]
         problems += [f"junit {stage}: now passes {t} (lower the floor)" for t in sorted(was - now)]
     if "imaptest_scripted" in result:
@@ -124,7 +122,7 @@ def compare(result, floors):
                 problems.append(f"imaptest stress: new kind of violation {kind!r} x{count}")
             elif count > ceilings[kind]:
                 problems.append(f"imaptest stress {kind!r}: {count} above its ceiling {ceilings[kind]}")
-    reasons = {**floors.get("reasons", {}), **floors.get("time_dependent", {})}
+    reasons = floors.get("reasons", {})
     failures = [t for stage in result["junit_failing"].values() for t in stage]
     failures += result.get("imaptest_scripted", {}).get("failing", [])
     problems += [f"no reason in floors.json for {t}" for t in sorted(set(failures)) if reason_for(t, reasons) is None]
@@ -132,10 +130,9 @@ def compare(result, floors):
 
 
 def update(result, floors):
-    time_dependent = set(floors.get("time_dependent", {}))
     floors["junit"] = {**floors.get("junit", {}), **{stage: counted(m) for stage, m in result["junit"].items()}}
     floors["junit_failing"] = {**floors.get("junit_failing", {}),
-                               **{stage: sorted(set(f) - time_dependent) for stage, f in result["junit_failing"].items()}}
+                               **{stage: sorted(set(f)) for stage, f in result["junit_failing"].items()}}
     if "imaptest_scripted" in result:
         floors["imaptest_scripted"] = result["imaptest_scripted"]
     ceilings = floors.setdefault("imaptest_stress_ceilings", {})
