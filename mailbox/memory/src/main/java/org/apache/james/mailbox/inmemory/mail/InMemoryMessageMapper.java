@@ -140,7 +140,12 @@ public class InMemoryMessageMapper extends AbstractMessageMapper {
 
     @Override
     public Iterator<MailboxMessage> findInMailbox(Mailbox mailbox, MessageRange set, FetchType ftype, int max) {
-        List<MailboxMessage> results = new ArrayList<>(getMembershipByUidForMailbox(mailbox).values());
+        Map<MessageUid, MailboxMessage> membershipByUid = getMembershipByUidForMailbox(mailbox);
+        List<MailboxMessage> results;
+        // Iterating while adds go on can pass a UID's empty slot and still reach a higher one added after it.
+        synchronized (membershipByUid) {
+            results = new ArrayList<>(membershipByUid.values());
+        }
         results.removeIf(mailboxMessage -> !set.includes(mailboxMessage.getUid()));
         
         Collections.sort(results);
