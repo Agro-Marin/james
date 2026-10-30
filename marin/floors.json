@@ -66,9 +66,17 @@
         "skipped": 0,
         "tests": 111
       },
+      "server/container/guice/protocols/jmap": {
+        "skipped": 0,
+        "tests": 30
+      },
       "server/mailet/mailets": {
         "skipped": 0,
         "tests": 1068
+      },
+      "server/protocols/jmap": {
+        "skipped": 0,
+        "tests": 32
       },
       "server/protocols/jmap-rfc-8621": {
         "skipped": 0,

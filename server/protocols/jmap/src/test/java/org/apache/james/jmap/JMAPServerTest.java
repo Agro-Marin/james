@@ -30,7 +30,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.is;
 
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -108,6 +112,35 @@ class JMAPServerTest {
                 .get()
             .then()
                 .statusCode(404);
+        } finally {
+            jmapServer.stop();
+        }
+    }
+
+    @Test
+    void serverShouldListenOnlyOnTheConfiguredHost() throws Exception {
+        VersionParser versionParser = new VersionParser(SUPPORTED_VERSIONS, JMAPConfiguration.DEFAULT);
+        JMAPServer jmapServer = new JMAPServer(JMAPConfiguration.builder()
+                .enable()
+                .randomPort()
+                .host(Optional.of("127.0.0.2"))
+                .build(),
+            NO_ROUTES_HANDLERS, versionParser);
+        jmapServer.start();
+
+        try {
+            int port = jmapServer.getPort().getValue();
+            given()
+                .baseUri("http://127.0.0.2")
+                .port(port)
+            .when()
+                .get()
+            .then()
+                .statusCode(404);
+            try (Socket socket = new Socket()) {
+                assertThatThrownBy(() -> socket.connect(new InetSocketAddress("127.0.0.1", port), 1000))
+                    .isInstanceOf(ConnectException.class);
+            }
         } finally {
             jmapServer.stop();
         }

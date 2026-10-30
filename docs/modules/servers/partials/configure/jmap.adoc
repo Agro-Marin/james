@@ -16,6 +16,10 @@ to get some examples and hints.
 | Optional. Defaults to 80. The port this server will be listening on. This value must be a valid
 port, ranging between 1 and 65535 (inclusive)
 
+| jmap.host
+| Optional. Defaults to every interface. The address this server will be listening on, e.g. `127.0.0.1`
+behind a reverse proxy.
+
 | tls.keystoreURL
 | Keystore to be used for generating authentication tokens for password authentication mechanism.
 This should not be the same keystore than the ones used by TLS based protocols.

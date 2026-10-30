@@ -91,10 +91,11 @@ public class JMAPServer implements Startable {
 
     public void start() {
         if (configuration.isEnabled()) {
-            server = Optional.of(HttpServer.create()
+            HttpServer httpServer = HttpServer.create()
                 .port(configuration.getPort()
                     .map(Port::getValue)
-                    .orElse(RANDOM_PORT))
+                    .orElse(RANDOM_PORT));
+            server = Optional.of(configuration.getHost().map(httpServer::host).orElse(httpServer)
                 .handle((request, response) -> handleVersionRoute(request).handleRequest(request, response))
                 .wiretap(wireTapEnabled())
                 .metrics(REACTOR_NETTY_METRICS_ENABLE, Function.identity())

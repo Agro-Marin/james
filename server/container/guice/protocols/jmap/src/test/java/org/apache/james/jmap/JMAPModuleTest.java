@@ -26,13 +26,37 @@ import static org.mockito.Mockito.when;
 
 import java.util.EnumSet;
 
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.james.jmap.JMAPModule.RequiredCapabilitiesStartUpCheck;
 import org.apache.james.mailbox.MailboxManager;
+import org.apache.james.utils.PropertiesProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class JMAPModuleTest {
+
+    @Nested
+    class ParseConfigurationTest {
+        private JMAPConfiguration parse(PropertiesConfiguration configuration) throws Exception {
+            PropertiesProvider propertiesProvider = mock(PropertiesProvider.class);
+            when(propertiesProvider.getConfiguration("jmap")).thenReturn(configuration);
+            return JMAPModule.parseConfiguration(propertiesProvider);
+        }
+
+        @Test
+        void hostShouldBeTheConfiguredOne() throws Exception {
+            PropertiesConfiguration configuration = new PropertiesConfiguration();
+            configuration.addProperty("jmap.host", "127.0.0.1");
+
+            assertThat(parse(configuration).getHost()).contains("127.0.0.1");
+        }
+
+        @Test
+        void hostShouldBeEveryInterfaceWhenNotConfigured() throws Exception {
+            assertThat(parse(new PropertiesConfiguration()).getHost()).isEmpty();
+        }
+    }
 
     @Nested
     class RequiredCapabilitiesStartUpCheckTest {

@@ -238,6 +238,7 @@ public class JMAPModule extends AbstractModule {
         return JMAPConfiguration.builder()
             .enabled(configuration.getBoolean("enabled", true))
             .port(Port.of(configuration.getInt("jmap.port", DEFAULT_JMAP_PORT)))
+            .host(Optional.ofNullable(configuration.getString("jmap.host", null)))
             .enableEmailQueryView(Optional.ofNullable(configuration.getBoolean("view.email.query.enabled", null)))
             .userProvisioningEnabled(Optional.ofNullable(configuration.getBoolean("user.provisioning.enabled", null)))
             .defaultVersion(Optional.ofNullable(configuration.getString("jmap.version.default", null))
