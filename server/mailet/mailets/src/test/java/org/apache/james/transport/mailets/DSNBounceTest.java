@@ -760,7 +760,7 @@ public class DSNBounceTest {
                 "\n" +
                 "Final-Recipient: rfc822; recipient@domain.com\n" +
                 "Action: failed\n" +
-                "Status: Delivery error\n" +
+                "Status: 5.0.0\n" +
                 "Diagnostic-Code: X-James; Delivery error\n" +
                 "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
@@ -876,7 +876,7 @@ public class DSNBounceTest {
                 "\n" +
                 "Final-Recipient: rfc822; recipient@domain.com\n" +
                 "Action: delivered\n" +
-                "Status: unknown\n" +
+                "Status: 2.0.0\n" +
                 "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
             List<SentMail> sentMails = fakeMailContext.getSentMails();
@@ -994,7 +994,7 @@ public class DSNBounceTest {
                 "\n" +
                 "Final-Recipient: rfc822; recipient@domain.com\n" +
                 "Action: delayed\n" +
-                "Status: Delivery error\n" +
+                "Status: 4.0.0\n" +
                 "Diagnostic-Code: X-James; Delivery error\n" +
                 "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
@@ -1110,7 +1110,7 @@ public class DSNBounceTest {
                 "\n" +
                 "Final-Recipient: rfc822; recipient@domain.com\n" +
                 "Action: relayed\n" +
-                "Status: unknown\n" +
+                "Status: 2.0.0\n" +
                 "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
             List<SentMail> sentMails = fakeMailContext.getSentMails();
@@ -1225,7 +1225,7 @@ public class DSNBounceTest {
                 "\n" +
                 "Final-Recipient: rfc822; recipient@domain.com\n" +
                 "Action: expanded\n" +
-                "Status: unknown\n" +
+                "Status: 2.0.0\n" +
                 "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
             List<SentMail> sentMails = fakeMailContext.getSentMails();
@@ -1267,7 +1267,7 @@ public class DSNBounceTest {
             "\n" +
             "Final-Recipient: rfc822; recipient@domain.com\n" +
             "Action: failed\n" +
-            "Status: Delivery error\n" +
+            "Status: 5.0.0\n" +
             "Diagnostic-Code: X-James; Delivery error\n" +
             "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
@@ -1311,7 +1311,7 @@ public class DSNBounceTest {
             "\n" +
             "Final-Recipient: rfc822; recipient@domain.com\n" +
             "Action: failed\n" +
-            "Status: Delivery error\n" +
+            "Status: 5.0.0\n" +
             "Diagnostic-Code: X-James; Delivery error\n" +
             "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
@@ -1354,7 +1354,6 @@ public class DSNBounceTest {
             "Final-Recipient: rfc822; recipient@domain.com\n" +
             "Action: failed\n" +
             "Status: 4.0.0\n" +
-            "Diagnostic-Code: X-James; 4.0.0\n" +
             "Last-Attempt-Date: Thu, 8 Sep 2016 14:25:52 +0000\n";
 
         List<SentMail> sentMails = fakeMailContext.getSentMails();
@@ -1495,5 +1494,109 @@ public class DSNBounceTest {
 
         assertThat(MimeMessageUtil.asString(sentMessage))
             .contains("Auto-Submitted: auto-replied");
+    }
+
+    @Nested
+    class StatusField {
+        private String deliveryStatus(FakeMailetConfig.Builder config, Attribute... attributes) throws Exception {
+            dsnBounce.init(config
+                .mailetName(MAILET_NAME)
+                .mailetContext(fakeMailContext)
+                .build());
+            FakeMail mail = FakeMail.builder()
+                .name(MAILET_NAME)
+                .sender(new MailAddress("sender@domain.com"))
+                .attributes(List.of(attributes))
+                .mimeMessage(MimeMessageBuilder.mimeMessageBuilder()
+                    .setText("My content"))
+                .recipient("recipient@domain.com")
+                .lastUpdated(Date.from(Instant.parse("2016-09-08T14:25:52.000Z")))
+                .remoteAddr("remoteHost")
+                .build();
+
+            dsnBounce.service(mail);
+
+            MimeMultipart content = (MimeMultipart) fakeMailContext.getSentMails().get(0).getMsg().getContent();
+            return IOUtils.toString((SharedByteArrayInputStream) content.getBodyPart(1).getContent(), StandardCharsets.UTF_8);
+        }
+
+        private Attribute deliveryError(String error) {
+            return new Attribute(AttributeName.of("delivery-error"), AttributeValue.of(error));
+        }
+
+        @Test
+        void statusShouldBeTheEnhancedStatusCodeOfTheSmtpReply() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder(),
+                deliveryError("550 5.1.1 <recipient@domain.com>: Recipient address rejected: User unknown")))
+                .contains("Status: 5.1.1\n" +
+                    "Diagnostic-Code: smtp; 550 5.1.1 <recipient@domain.com>: Recipient address rejected: User unknown\n");
+        }
+
+        @Test
+        void multilineSmtpReplyShouldBeOneDiagnosticCodeField() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder(),
+                deliveryError("550-5.1.1 The email account that you tried to reach does not exist.\r\n" +
+                    "550-5.1.1 Please try double-checking the recipient's email address.\r\n" +
+                    "550 5.1.1 https://support.example/answer - gsmtp\r\n")))
+                .contains("Action: failed\n" +
+                    "Status: 5.1.1\n" +
+                    "Diagnostic-Code: smtp; 550-5.1.1 The email account that you tried to reach does not exist. " +
+                    "550-5.1.1 Please try double-checking the recipient's email address. " +
+                    "550 5.1.1 https://support.example/answer - gsmtp\n" +
+                    "Last-Attempt-Date: ");
+        }
+
+        @Test
+        void enhancedStatusCodeOfTheSmtpReplyShouldWinOverDefaultStatus() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder().setProperty("defaultStatus", "5.0.0"),
+                deliveryError("554 5.7.1 Message rejected as spam")))
+                .contains("Status: 5.7.1\n");
+        }
+
+        @Test
+        void defaultStatusShouldWinOverTheClassOfTheSmtpReplyCode() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder().setProperty("defaultStatus", "5.1.6"),
+                deliveryError("550 Mailbox has moved")))
+                .contains("Status: 5.1.6\n" +
+                    "Diagnostic-Code: smtp; 550 Mailbox has moved\n");
+        }
+
+        @Test
+        void statusShouldBeTheClassOfTheSmtpReplyCodeWhenTheReplyHasNoEnhancedStatusCode() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder(),
+                deliveryError("421 Service not available, closing transmission channel")))
+                .contains("Action: failed\n" +
+                    "Status: 4.0.0\n" +
+                    "Diagnostic-Code: smtp; 421 Service not available, closing transmission channel\n");
+        }
+
+        @Test
+        void statusShouldBeTheClassOfTheDeliveryErrorCodeWhenTheErrorHasNoReplyCode() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder(),
+                deliveryError("Exception reading response"),
+                new Attribute(AttributeName.of("delivery-error-code"), AttributeValue.of(452))))
+                .contains("Status: 4.0.0\n" +
+                    "Diagnostic-Code: X-James; Exception reading response\n");
+        }
+
+        @Test
+        void statusShouldBeTheClassOfTheActionWhenNothingNamesOne() throws Exception {
+            assertThat(deliveryStatus(FakeMailetConfig.builder(),
+                deliveryError("Unknown host: other.example")))
+                .contains("Status: 5.0.0\n" +
+                    "Diagnostic-Code: X-James; Unknown host: other.example\n");
+        }
+
+        @Test
+        void initShouldFailWhenDefaultStatusIsNotAStatusCode() {
+            for (String defaultStatus : List.of("unknown", "5.01.0", "3.0.0", "5.0.0 (failed)")) {
+                assertThatThrownBy(() -> dsnBounce.init(FakeMailetConfig.builder()
+                        .mailetName(MAILET_NAME)
+                        .mailetContext(fakeMailContext)
+                        .setProperty("defaultStatus", defaultStatus)
+                        .build()))
+                    .isInstanceOf(IllegalArgumentException.class);
+            }
+        }
     }
 }

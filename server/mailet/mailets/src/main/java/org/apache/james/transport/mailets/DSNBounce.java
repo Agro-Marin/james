@@ -20,6 +20,7 @@
 package org.apache.james.transport.mailets;
 
 import static org.apache.james.transport.mailets.remote.delivery.Bouncer.DELIVERY_ERROR;
+import static org.apache.james.transport.mailets.remote.delivery.Bouncer.DELIVERY_ERROR_CODE;
 import static org.apache.mailet.base.AutomaticallySentMailDetector.AUTO_REPLIED_VALUE;
 import static org.apache.mailet.base.AutomaticallySentMailDetector.AUTO_SUBMITTED_HEADER;
 
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -118,7 +120,7 @@ import scala.collection.mutable.StringBuilder;
  *   &lt;passThrough&gt;<i>true or false, default=true</i>&lt;/passThrough&gt;
  *   &lt;debug&gt;<i>true or false, default=false</i>&lt;/debug&gt;
  *   &lt;action&gt;<i>failed, delayed, delivered, expanded or relayed, default=failed</i>&lt;/action&gt;
- *   &lt;defaultStatus&gt;<i>SMTP status code. Try to adapt it to the mailet position: 2.0.0 for success, 4.0.0 for delays, 5.0.0 for failures default=unknown</i>&lt;/defaultStatus&gt;  &lt;!-- See https://tools.ietf.org/html/rfc3463 --&gt;
+ *   &lt;defaultStatus&gt;<i>status code (RFC 3463) used when the SMTP reply carries none. Try to adapt it to the mailet position: 2.0.0 for success, 4.0.0 for delays, 5.0.0 for failures, default=the class of the SMTP reply code, else of the action</i>&lt;/defaultStatus&gt;  &lt;!-- See https://tools.ietf.org/html/rfc3463 --&gt;
  * &lt;/mailet&gt;
  * </code>
  * </pre>
@@ -136,11 +138,11 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
     private static final Logger LOGGER = LoggerFactory.getLogger(DSNBounce.class);
 
     enum Action {
-        DELIVERED("Delivered", false),
-        DELAYED("Delayed", true),
-        FAILED("Failed", true),
-        EXPANDED("Expanded", false),
-        RELAYED("Relayed", false);
+        DELIVERED("Delivered", false, "2.0.0"),
+        DELAYED("Delayed", true, "4.0.0"),
+        FAILED("Failed", true, "5.0.0"),
+        EXPANDED("Expanded", false, "2.0.0"),
+        RELAYED("Relayed", false, "2.0.0");
 
         public static Optional<Action> parse(String serialized) {
             return Stream.of(Action.values())
@@ -150,10 +152,12 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
 
         private final String value;
         private final boolean shouldIncludeDiagnosticCode;
+        private final String status;
 
-        Action(String value, boolean shouldIncludeDiagnosticCode) {
+        Action(String value, boolean shouldIncludeDiagnosticCode, String status) {
             this.value = value;
             this.shouldIncludeDiagnosticCode = shouldIncludeDiagnosticCode;
+            this.status = status;
         }
 
         public String asString() {
@@ -163,6 +167,10 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
         public boolean shouldIncludeDiagnostic() {
             return shouldIncludeDiagnosticCode;
         }
+
+        public String status() {
+            return status;
+        }
     }
 
     private static final ImmutableSet<String> CONFIGURABLE_PARAMETERS = ImmutableSet.of("debug", "passThrough", "messageString", "attachment", "sender", "prefix", "action", "defaultStatus");
@@ -170,7 +178,12 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
     private static final List<InternetAddress> TO_INTERNET_ADDRESSES = ImmutableList.of(SpecialAddress.REVERSE_PATH.toInternetAddress().get());
 
     private static final String LOCALHOST = "127.0.0.1";
-    private static final Pattern DIAG_PATTERN = Patterns.compilePatternUncheckedException("^\\d{3}\\s.*$");
+    private static final Pattern DIAG_PATTERN = Patterns.compilePatternUncheckedException("^\\d{3}[ -]");
+    private static final String STATUS_CODE = "[245]\\.(?:0|[1-9]\\d{0,2})\\.(?:0|[1-9]\\d{0,2})";
+    private static final Pattern STATUS_CODE_PATTERN = Patterns.compilePatternUncheckedException(STATUS_CODE);
+    private static final Pattern ENHANCED_REPLY_PATTERN = Patterns.compilePatternUncheckedException("^[245]\\d\\d[ -](" + STATUS_CODE + ")(?![\\d.])");
+    private static final Pattern REPLY_CODE_PATTERN = Patterns.compilePatternUncheckedException("^([245])\\d\\d(?:[ -]|$)");
+    private static final Pattern LINE_BREAKS = Patterns.compilePatternUncheckedException("\\s*[\\r\\n]+\\s*");
     private static final String MACHINE_PATTERN = "[machine]";
     private static final String LINE_BREAK = "\n";
 
@@ -178,7 +191,7 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
     private final DateTimeFormatter dateFormatter;
     private String messageString = null;
     private Action action = null;
-    private String defaultStatus;
+    private Optional<String> defaultStatus;
 
     @Inject
     public DSNBounce(DNSService dns) {
@@ -209,7 +222,10 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
             .map(configuredValue -> Action.parse(configuredValue)
                 .orElseThrow(() -> new IllegalArgumentException("Action '" + configuredValue + "' is not supported")))
             .orElse(Action.FAILED);
-        defaultStatus = getInitParameter("defaultStatus", "unknown");
+        defaultStatus = Optional.ofNullable(getInitParameter("defaultStatus", null))
+            .map(configuredValue -> Optional.of(configuredValue)
+                .filter(value -> STATUS_CODE_PATTERN.matcher(value).matches())
+                .orElseThrow(() -> new IllegalArgumentException("Status '" + configuredValue + "' is not an RFC 3463 status code")));
     }
 
     @Override
@@ -495,8 +511,10 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
                 .append(arrivalDate.format(dateFormatter))
                 .append(LINE_BREAK));
 
+        Optional<String> deliveryError = getDeliveryError(originalMail);
+        String status = getStatus(originalMail, deliveryError);
         for (MailAddress rec : originalMail.getRecipients()) {
-            appendRecipient(buffer, rec, getDeliveryError(originalMail), originalMail.getLastUpdated());
+            appendRecipient(buffer, rec, status, deliveryError, originalMail.getLastUpdated());
         }
 
         MimeBodyPart bodyPart = new MimeBodyPart();
@@ -516,26 +534,46 @@ public class DSNBounce extends GenericMailet implements RedirectNotify {
         }
     }
 
-    private void appendRecipient(StringBuilder buffer, MailAddress mailAddress, String deliveryError, Date lastUpdated) {
+    private void appendRecipient(StringBuilder buffer, MailAddress mailAddress, String status, Optional<String> deliveryError, Date lastUpdated) {
         buffer.append(LINE_BREAK);
         buffer.append("Final-Recipient: rfc822; " + mailAddress.toString()).append(LINE_BREAK);
         buffer.append("Action: ").append(action.asString().toLowerCase(Locale.US)).append(LINE_BREAK);
-        buffer.append("Status: " + deliveryError).append(LINE_BREAK);
+        buffer.append("Status: " + status).append(LINE_BREAK);
         if (action.shouldIncludeDiagnostic()) {
-            buffer.append("Diagnostic-Code: " + getDiagnosticType(deliveryError) + "; " + deliveryError).append(LINE_BREAK);
+            deliveryError.ifPresent(error -> buffer.append("Diagnostic-Code: " + getDiagnosticType(error) + "; " + error).append(LINE_BREAK));
         }
         buffer.append("Last-Attempt-Date: " + dateFormatter.format(ZonedDateTime.ofInstant(lastUpdated.toInstant(), ZoneId.systemDefault())))
             .append(LINE_BREAK);
     }
 
-    private String getDeliveryError(Mail originalMail) {
+    private Optional<String> getDeliveryError(Mail originalMail) {
         return AttributeUtils
             .getValueAndCastFromMail(originalMail, DELIVERY_ERROR, String.class)
-            .orElse(defaultStatus);
+            .map(error -> LINE_BREAKS.matcher(error.trim()).replaceAll(" "));
+    }
+
+    private String getStatus(Mail originalMail, Optional<String> deliveryError) {
+        return deliveryError
+            .flatMap(error -> firstGroup(ENHANCED_REPLY_PATTERN, error))
+            .or(() -> defaultStatus)
+            .or(() -> AttributeUtils.getValueAndCastFromMail(originalMail, DELIVERY_ERROR_CODE, Integer.class)
+                .map(code -> String.valueOf(code / 100))
+                .filter(replyClass -> replyClass.matches("[245]"))
+                .or(() -> deliveryError.flatMap(error -> firstGroup(REPLY_CODE_PATTERN, error)))
+                .map(replyClass -> replyClass + ".0.0"))
+            .orElse(action.status());
+    }
+
+    private Optional<String> firstGroup(Pattern pattern, String text) {
+        Matcher matcher = pattern.matcher(text);
+        if (matcher.find()) {
+            return Optional.of(matcher.group(1));
+        }
+        return Optional.empty();
     }
 
     private String getDiagnosticType(String diagnosticCode) {
-        if (DIAG_PATTERN.matcher(diagnosticCode).matches()) {
+        if (DIAG_PATTERN.matcher(diagnosticCode).find()) {
             return "smtp";
         }
         return "X-James";

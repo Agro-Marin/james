@@ -295,7 +295,8 @@ class DSNRemoteIntegrationTest {
             .readFirstMessage();
 
         Assertions.assertThat(dsnMessage).contains("Subject: [FAILURE]");
-        Assertions.assertThat(dsnMessage).contains("Status: 521 mock response");
+        Assertions.assertThat(dsnMessage).contains("Status: 5.0.0");
+        Assertions.assertThat(dsnMessage).contains("Diagnostic-Code: smtp; 521 mock response");
         Assertions.assertThat(dsnMessage).contains("Your message failed to be delivered\n" +
             "Failed recipient(s):\n" +
             "touser@other.com");
@@ -348,7 +349,8 @@ class DSNRemoteIntegrationTest {
             .readFirstMessage();
 
         Assertions.assertThat(dsnMessage).contains("Subject: [FAILURE]");
-        Assertions.assertThat(dsnMessage).contains("Status: 521 mock response");
+        Assertions.assertThat(dsnMessage).contains("Status: 5.0.0");
+        Assertions.assertThat(dsnMessage).contains("Diagnostic-Code: smtp; 521 mock response");
         Assertions.assertThat(dsnMessage).contains("Your message failed to be delivered\n" +
             "Failed recipient(s):\n" +
             "touser@other.com");

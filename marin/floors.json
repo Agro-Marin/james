@@ -68,7 +68,7 @@
       },
       "server/mailet/mailets": {
         "skipped": 0,
-        "tests": 1060
+        "tests": 1068
       },
       "server/protocols/jmap-rfc-8621": {
         "skipped": 0,
