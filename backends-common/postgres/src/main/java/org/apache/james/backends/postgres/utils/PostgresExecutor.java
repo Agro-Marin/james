@@ -50,10 +50,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 
 import io.r2dbc.postgresql.api.PostgresqlConnection;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcBadGrammarException;
+import io.r2dbc.spi.R2dbcException;
 import io.r2dbc.spi.Wrapped;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -65,6 +67,7 @@ public class PostgresExecutor {
     public static final String BY_PASS_RLS_INJECT = "by_pass_rls";
     public static final int MAX_RETRY_ATTEMPTS = 5;
     public static final Duration MIN_BACKOFF = Duration.ofMillis(1);
+    private static final String DEADLOCK_DETECTED = "40P01";
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgresExecutor.class);
     private static final String JOOQ_TIMEOUT_ERROR_LOG = "Time out executing Postgres query. May need to check either jOOQ reactive issue or Postgres DB performance.";
     public static final boolean EAGER_FETCH = true;
@@ -125,7 +128,7 @@ public class PostgresExecutor {
                     .timeout(postgresConfiguration.getJooqReactiveTimeout())
                     .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                        .filter(preparedStatementConflictException()))
+                        .filter(retryableStatementException()))
                     .then())));
     }
 
@@ -156,7 +159,7 @@ public class PostgresExecutor {
                         .timeout(postgresConfiguration.getJooqReactiveTimeout())
                         .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                         .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                            .filter(preparedStatementConflictException()));
+                            .filter(retryableStatementException()));
 
                     if (isEagerFetch) {
                         return recordFlux.collectList().flatMapIterable(list -> list);
@@ -212,7 +215,7 @@ public class PostgresExecutor {
                     .timeout(postgresConfiguration.getJooqReactiveTimeout())
                     .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                        .filter(preparedStatementConflictException())))));
+                        .filter(retryableStatementException())))));
     }
 
     public Mono<Record> executeRow(Function<DSLContext, Publisher<Record>> queryFunction) {
@@ -223,7 +226,7 @@ public class PostgresExecutor {
                     .timeout(postgresConfiguration.getJooqReactiveTimeout())
                     .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                        .filter(preparedStatementConflictException())))));
+                        .filter(retryableStatementException())))));
     }
 
     public Mono<Optional<Record>> executeSingleRowOptional(Function<DSLContext, Publisher<Record>> queryFunction) {
@@ -240,7 +243,7 @@ public class PostgresExecutor {
                     .timeout(postgresConfiguration.getJooqReactiveTimeout())
                     .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                        .filter(preparedStatementConflictException()))
+                        .filter(retryableStatementException()))
                     .map(Record1::value1))));
     }
 
@@ -257,7 +260,7 @@ public class PostgresExecutor {
                     .timeout(postgresConfiguration.getJooqReactiveTimeout())
                     .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                        .filter(preparedStatementConflictException())))));
+                        .filter(retryableStatementException())))));
     }
 
     public <T> Mono<T> executeTransaction(Function<DSLContext, Mono<T>> transactionFunction) {
@@ -271,7 +274,7 @@ public class PostgresExecutor {
                     .timeout(postgresConfiguration.getJooqReactiveTimeout())
                     .onErrorResume(TimeoutException.class, e -> handleTimeout(connection, e))
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, MIN_BACKOFF)
-                        .filter(preparedStatementConflictException())))));
+                        .filter(retryableStatementException())))));
     }
 
     public JamesPostgresConnectionFactory connectionFactory() {
@@ -352,6 +355,18 @@ public class PostgresExecutor {
             return Optional.of(postgresqlConnection);
         }
         return Optional.empty();
+    }
+
+    // PostgreSQL rolls back the transaction of a deadlock's victim, and sends a DML statement's RETURNING rows only once
+    // it completes: a victim changed nothing, and running its statement or its transaction again is what PostgreSQL
+    // advises. Two sessions expunging overlapping UIDs of a mailbox can lock its rows in different orders.
+    private Predicate<Throwable> retryableStatementException() {
+        return preparedStatementConflictException().or(deadlockVictim());
+    }
+
+    private Predicate<Throwable> deadlockVictim() {
+        return throwable -> Throwables.getCausalChain(throwable).stream()
+            .anyMatch(cause -> cause instanceof R2dbcException exception && DEADLOCK_DETECTED.equals(exception.getSqlState()));
     }
 
     private Predicate<Throwable> preparedStatementConflictException() {

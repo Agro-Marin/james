@@ -90,7 +90,7 @@
     "pg": {
       "backends-common/postgres": {
         "skipped": 1,
-        "tests": 57
+        "tests": 58
       },
       "mailbox/postgres": {
         "skipped": 12,
