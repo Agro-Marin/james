@@ -77,6 +77,9 @@ public class LSubProcessor extends AbstractMailboxProcessor<LsubRequest> {
     }
 
     private Mono<Void> listSubscriptions(ImapSession session, Responder responder, String referenceName, String mailboxName) {
+        if (!ModifiedUtf7.isDecodable(mailboxName)) {
+            return Mono.empty();
+        }
         MailboxSession mailboxSession = session.getMailboxSession();
         try {
             PathConverter pathConverter = pathConverterFactory.forSession(session);

@@ -41,6 +41,8 @@ import org.apache.james.imap.message.request.ListRequest;
 import org.apache.james.imap.message.request.ListRequest.ListReturnOption;
 import org.apache.james.imap.message.request.ListRequest.ListSelectOption;
 
+import com.google.common.collect.ImmutableList;
+
 /**
  * Parse LIST commands
  */
@@ -71,52 +73,82 @@ public class ListCommandParser extends AbstractUidCommandParser {
      * Reads an argument of type "list_mailbox" from the request, which is the
      * second argument for a LIST or LSUB command. Valid values are a "string"
      * argument, an "atom" with wildcard characters.
+     *
+     * The pattern is carried modified UTF-7 encoded, as read: one that does not decode names no mailbox, and the
+     * processors ignore it (RFC 5258 3: a pattern the server does not accept is silently ignored).
      * 
      * @return An argument of type "list_mailbox"
      */
     public String listMailbox(ImapRequestLineReader request) throws DecodingException {
+        return listMailbox(request, false);
+    }
+
+    private String listMailbox(ImapRequestLineReader request, boolean inPatternList) throws DecodingException {
         char next = request.nextWordChar();
         switch (next) {
         case '"':
-            return assertDecodable(request.consumeQuoted());
+            return request.consumeQuoted();
         case '{':
-            return assertDecodable(request.consumeLiteral(null));
+            return request.consumeLiteral(null);
         default:
-            return assertDecodable(request.consumeWord(ListCharValidator.INSTANCE));
+            return request.consumeWord(ListCharValidator.INSTANCE, inPatternList);
         }
     }
 
     /**
-     * The mailbox pattern is carried around modified UTF-7 encoded and is only decoded upon processing.
-     *
-     * Validate it here so that a malformed pattern is answered a BAD response rather than blowing up
-     * later on, outside of any decoding error handling.
+     * The reference is carried modified UTF-7 encoded, like the pattern it prefixes, and decoded once, upon
+     * processing.
      */
-    private String assertDecodable(String mailboxPattern) throws DecodingException {
+    private String referenceName(ImapRequestLineReader request) throws DecodingException {
+        String referenceName = request.mailboxUTF7();
         try {
-            ModifiedUtf7.decodeModifiedUTF7(mailboxPattern);
-            return mailboxPattern;
+            ModifiedUtf7.decodeModifiedUTF7(referenceName);
+            return referenceName;
         } catch (MalformedUtf7Exception e) {
-            throw new DecodingException(HumanReadableText.ILLEGAL_ARGUMENTS, "Invalid mailbox pattern: not a valid modified UTF-7 value", e);
+            throw DecodingException.no(HumanReadableText.INVALID_MAILBOX_NAME, "Invalid reference name: not a valid modified UTF-7 value", e);
         }
+    }
+
+    /**
+     * RFC 5258 patterns: "(" list-mailbox *(SP list-mailbox) ")". The empty string in a list is ignored for
+     * the purpose of matching.
+     */
+    private Optional<ImmutableList<String>> patterns(ImapRequestLineReader request) throws DecodingException {
+        if (request.nextWordChar() != '(') {
+            return Optional.empty();
+        }
+        request.consumeChar('(');
+        ImmutableList.Builder<String> patterns = ImmutableList.builder();
+        do {
+            String pattern = listMailbox(request, true);
+            if (!pattern.isEmpty()) {
+                patterns.add(pattern);
+            }
+        } while (request.nextWordChar() != ')');
+        request.consumeChar(')');
+        return Optional.of(patterns.build());
     }
 
     @Override
     protected ImapMessage decode(ImapRequestLineReader request, Tag tag, boolean useUids, ImapSession session) throws DecodingException {
+        boolean selectOptionsGiven = request.nextWordChar() == '(';
         EnumSet<ListSelectOption> listOptions = parseSelectOptions(request);
-        String referenceName = request.mailbox();
-        String mailboxPattern = listMailbox(request);
+        String referenceName = referenceName(request);
+        Optional<ImmutableList<String>> patternList = patterns(request);
+        ImmutableList<String> patterns = patternList.isPresent() ? patternList.get() : ImmutableList.of(listMailbox(request));
 
-        Pair<EnumSet<ListReturnOption>, Optional<StatusDataItems>> listReturnOptions = parseReturnOptions(request);
+        Optional<Pair<EnumSet<ListReturnOption>, Optional<StatusDataItems>>> returnOptionsGiven = parseReturnOptions(request);
+        Pair<EnumSet<ListReturnOption>, Optional<StatusDataItems>> listReturnOptions = returnOptionsGiven
+            .orElseGet(() -> Pair.of(EnumSet.noneOf(ListReturnOption.class), Optional.empty()));
         request.eol();
 
-        if (listOptions.isEmpty() && listReturnOptions.getLeft().isEmpty()) {
-            return createMessage(referenceName, mailboxPattern, tag);
+        if (!selectOptionsGiven && returnOptionsGiven.isEmpty() && patternList.isEmpty()) {
+            return createMessage(referenceName, patterns.getFirst(), tag);
         }
         if (listOptions.contains(ListSelectOption.SPECIAL_USE)) {
             listReturnOptions.getLeft().add(ListReturnOption.SPECIAL_USE);
         }
-        return new ListRequest(ImapConstants.LIST_COMMAND, referenceName, mailboxPattern, tag, listOptions, listReturnOptions.getLeft(), listReturnOptions.getRight());
+        return new ListRequest(ImapConstants.LIST_COMMAND, referenceName, patterns, tag, listOptions, listReturnOptions.getLeft(), listReturnOptions.getRight());
     }
 
     protected ImapMessage createMessage(String referenceName, String mailboxPattern, Tag tag) {
@@ -137,6 +169,10 @@ public class ListCommandParser extends AbstractUidCommandParser {
             request.nextWordChar();
         }
         request.consumeChar(')');
+        if (listOptions.contains(ListSelectOption.RECURSIVEMATCH)
+            && EnumSet.complementOf(EnumSet.of(ListSelectOption.RECURSIVEMATCH, ListSelectOption.REMOTE)).stream().noneMatch(listOptions::contains)) {
+            throw new DecodingException(HumanReadableText.ILLEGAL_ARGUMENTS, "RECURSIVEMATCH needs another selection option than REMOTE (RFC 5258 3)");
+        }
         return listOptions;
     }
 
@@ -245,7 +281,7 @@ public class ListCommandParser extends AbstractUidCommandParser {
         return ListSelectOption.RECURSIVEMATCH;
     }
 
-    private Pair<EnumSet<ListReturnOption>, Optional<StatusDataItems>> parseReturnOptions(ImapRequestLineReader request) throws DecodingException {
+    private Optional<Pair<EnumSet<ListReturnOption>, Optional<StatusDataItems>>> parseReturnOptions(ImapRequestLineReader request) throws DecodingException {
         if (request.nextWordCharLenient().isPresent()) {
             String returnKey = request.consumeWord(AtomCharValidator.INSTANCE);
             if ("RETURN".equalsIgnoreCase(returnKey)) {
@@ -264,12 +300,12 @@ public class ListCommandParser extends AbstractUidCommandParser {
                     request.nextWordChar();
                 }
                 request.consumeChar(')');
-                return Pair.of(listReturnOptions, statusDataItems);
+                return Optional.of(Pair.of(listReturnOptions, statusDataItems));
             } else {
                 throw new DecodingException(HumanReadableText.ILLEGAL_ARGUMENTS, "Unknown '" + returnKey + "' option'");
             }
         }
-        return Pair.of(EnumSet.noneOf(ListReturnOption.class), Optional.empty());
+        return Optional.empty();
     }
 
     private Pair<ListReturnOption, Optional<StatusDataItems>> parseListReturnOption(ImapRequestLineReader request) throws DecodingException {

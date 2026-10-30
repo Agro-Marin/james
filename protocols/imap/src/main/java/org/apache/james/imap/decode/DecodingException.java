@@ -51,6 +51,18 @@ public class DecodingException extends IOException {
 
     private Throwable t;
 
+    private boolean answeredNo;
+
+    /**
+     * Constructs a decoding exception for an argument the syntax allows but the server cannot act on,
+     * such as a mailbox name that is not valid modified UTF-7: the command is answered NO, not BAD.
+     */
+    public static DecodingException no(HumanReadableText key, String s, Throwable t) {
+        DecodingException exception = new DecodingException(key, s, t);
+        exception.answeredNo = true;
+        return exception;
+    }
+
     /**
      * Constructs a decoding exception
      * 
@@ -88,6 +100,10 @@ public class DecodingException extends IOException {
     public final HumanReadableText getKey() {
         // API specifies not null but best to default to generic message
         return Objects.requireNonNullElse(this.key, HumanReadableText.ILLEGAL_ARGUMENTS);
+    }
+
+    public boolean isAnsweredNo() {
+        return answeredNo;
     }
 
     @Override

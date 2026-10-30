@@ -16,50 +16,68 @@
 # specific language governing permissions and limitations      #
 # under the License.                                           #
 ################################################################
-# A mailbox name holding a badly encoded modified UTF-7 sequence must be
-# rejected with a BAD response, and must not tear down the connection.
+# A mailbox name holding a badly encoded modified UTF-7 sequence is a valid atom or string that names no
+# mailbox: it is answered NO, and must not tear down the connection.
 C: A1 CREATE &
-S: A1 BAD CREATE failed. Illegal arguments.
+S: A1 NO CREATE failed. Invalid mailbox name.
 
 # An unterminated shift sequence: the trailing '-' is missing
 C: A2 CREATE "&AOE"
-S: A2 BAD CREATE failed. Illegal arguments.
+S: A2 NO CREATE failed. Invalid mailbox name.
 
 # Non BASE64 content within a shift sequence
 C: A3 CREATE "&x-"
-S: A3 BAD CREATE failed. Illegal arguments.
+S: A3 NO CREATE failed. Invalid mailbox name.
 
 # Other commands taking a mailbox name are rejected the very same way
 C: A4 SELECT &
-S: A4 BAD SELECT failed. Illegal arguments.
+S: A4 NO SELECT failed. Invalid mailbox name.
 
 C: A5 DELETE "&AOE"
-S: A5 BAD DELETE failed. Illegal arguments.
+S: A5 NO DELETE failed. Invalid mailbox name.
 
 C: A6 STATUS & (MESSAGES)
-S: A6 BAD STATUS failed. Illegal arguments.
+S: A6 NO STATUS failed. Invalid mailbox name.
 
 C: A7 RENAME & other
-S: A7 BAD RENAME failed. Illegal arguments.
+S: A7 NO RENAME failed. Invalid mailbox name.
 
 C: A8 SUBSCRIBE &
-S: A8 BAD SUBSCRIBE failed. Illegal arguments.
+S: A8 NO SUBSCRIBE failed. Invalid mailbox name.
 
-# LIST and LSUB carry their pattern modified UTF-7 encoded up to the processor
 C: A9 LIST "&" ""
-S: A9 BAD LIST failed. Illegal arguments.
+S: A9 NO LIST failed. Invalid mailbox name.
 
+# RFC 5258 3: a LIST pattern the server does not accept is silently ignored; it matches no mailbox
 C: A10 LIST "" "&AOE"
-S: A10 BAD LIST failed. Illegal arguments.
+S: A10 OK LIST completed.
 
 C: A11 LSUB "" "&AOE"
-S: A11 BAD LSUB failed. Illegal arguments.
+S: A11 OK LSUB completed.
+
+C: A111 LIST "" ("&AOE" "&x-")
+S: A111 OK LIST completed.
 
 # '&-' is the modified UTF-7 encoding of a single '&': a valid reference name that
 # decodes to a value that is not valid modified UTF-7 itself
 C: A12 LIST "&-" ""
 S: \* LIST \(\\Noselect\) \"\.\" \"\"
 S: A12 OK LIST completed.
+
+# The reference is decoded once, as the pattern is
+C: A121 CREATE "&-.child"
+S: A121 OK \[MAILBOXID \(.+\)\] CREATE completed.
+
+C: A122 LIST "&-." "*"
+S: \* LIST \(\\HasNoChildren\) \"\.\" \"&-\.child\"
+S: A122 OK LIST completed.
+
+C: A123 SUBSCRIBE "&-.child"
+S: A123 OK SUBSCRIBE completed.
+
+C: A124 LSUB "&-." "*"
+S: \* LSUB \(\) \"\.\" \"&-\.child\"
+S: A124 OK LSUB completed.
 
 # Valid modified UTF-7 keeps being accepted: &AOE- decodes to 'a' with an acute accent
 C: A13 CREATE "&AOE-"

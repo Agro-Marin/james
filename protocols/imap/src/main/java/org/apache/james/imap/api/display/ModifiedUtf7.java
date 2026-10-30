@@ -58,6 +58,15 @@ public class ModifiedUtf7 {
         }
     }
 
+    public static boolean isDecodable(String input) {
+        try {
+            decodeModifiedUTF7(input);
+            return true;
+        } catch (MalformedUtf7Exception e) {
+            return false;
+        }
+    }
+
     /**
      * Encode the given <code>String</code> to modified UTF7. 
      * See RFC3501 for more details

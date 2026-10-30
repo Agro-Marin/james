@@ -24,6 +24,7 @@ import static org.apache.james.imap.message.request.ListRequest.ListSelectOption
 import static org.apache.james.mailbox.MailboxManager.MailboxSearchFetchType.Minimal;
 
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -135,13 +136,13 @@ public class ListProcessor<T extends ListRequest> extends AbstractMailboxProcess
             .then(Mono.fromRunnable(() -> okComplete(request, responder)))
             .onErrorResume(MailboxException.class, e -> {
                 no(request, responder, HumanReadableText.SEARCH_FAILED);
-                return ReactorUtils.logAsMono(() -> LOGGER.error("List failed for mailboxName {}", request.getMailboxPattern(), e));
+                return ReactorUtils.logAsMono(() -> LOGGER.error("List failed for mailbox patterns {}", request.getMailboxPatterns(), e));
             })
             .then();
     }
 
     private Mono<Void> respond(ImapSession session, Responder responder, T request, MailboxSession mailboxSession) {
-        if (request.getMailboxPattern().isEmpty()) {
+        if (request.isHierarchyDelimiterRequest()) {
             return Mono.fromRunnable(() -> respondNamespace(request.getBaseReferenceName(), responder, mailboxSession));
         } else {
             return respondMailboxList(request, session, responder, mailboxSession);
@@ -184,38 +185,78 @@ public class ListProcessor<T extends ListRequest> extends AbstractMailboxProcess
         }
     }
 
+    /**
+     * One of the request's patterns, combined with its reference. isRelative tells whether its names are listed
+     * relative to the user's namespace.
+     */
+    private record ListPattern(MailboxQuery query, Predicate<String> nameMatches, boolean isRelative) {
+        boolean matches(MailboxPath path, PathConverter pathConverter, MailboxSession mailboxSession) {
+            return query.isPathMatch(path)
+                && pathConverter.mailboxName(isRelative, path, mailboxSession).map(nameMatches::test).orElse(false);
+        }
+    }
+
+    private record Matched(ListPattern pattern, MailboxMetaData metaData) {
+    }
+
+    private List<ListPattern> listPatterns(T request, ImapSession session, MailboxSession mailboxSession) {
+        String referenceName = request.getBaseReferenceName();
+        return request.getMailboxPatterns().stream()
+            .filter(ModifiedUtf7::isDecodable)
+            .map(pattern -> {
+                String combined = referenceName + pattern;
+                MailboxNameExpression nameExpression = new PrefixedRegex(
+                    ModifiedUtf7.decodeModifiedUTF7(referenceName),
+                    ModifiedUtf7.decodeModifiedUTF7(pattern),
+                    mailboxSession.getPathDelimiter());
+                return new ListPattern(
+                    pathConverterFactory.forSession(session).mailboxQuery(referenceName, pattern, session),
+                    nameExpression::isExpressionMatch,
+                    combined.isEmpty() || combined.charAt(0) != MailboxConstants.NAMESPACE_PREFIX_CHAR);
+            })
+            .toList();
+    }
+
+    /**
+     * The mailboxes matching any of the patterns, each once, with the first pattern it matches (RFC 5258 3).
+     */
+    private Flux<Matched> search(List<ListPattern> patterns, MailboxSession mailboxSession) {
+        return Flux.fromIterable(patterns)
+            .concatMap(pattern -> getMailboxManager().search(pattern.query(), Minimal, mailboxSession)
+                .map(metaData -> new Matched(pattern, metaData)))
+            .distinct(matched -> matched.metaData().getPath());
+    }
+
     private Mono<Void> respondMailboxList(T request, ImapSession session,
                                           Responder responder, MailboxSession mailboxSession) {
         if (request.selectRemote()) {
             // https://www.rfc-editor.org/rfc/rfc5258.html. NOT YET SUPPORT `REMOTE`
             return Mono.empty();
         }
-
-        // Is the interpreted (combined) pattern relative?
-        // Should the namespace section be returned or not?
-        boolean isRelative = ((request.getBaseReferenceName() + request.getMailboxPattern()).charAt(0) != MailboxConstants.NAMESPACE_PREFIX_CHAR);
-
-        MailboxQuery mailboxQuery = pathConverterFactory.forSession(session)
-            .mailboxQuery(request.getBaseReferenceName(), request.getMailboxPattern(), session);
+        List<ListPattern> patterns = listPatterns(request, session, mailboxSession);
+        if (patterns.isEmpty()) {
+            return Mono.empty();
+        }
 
         if (request.selectSubscribed()) {
-            return processWithSubscribed(session, request, responder, mailboxSession, isRelative, mailboxQuery);
+            return processWithSubscribed(session, request, responder, mailboxSession, patterns);
         } else if (request.getReturnOptions().contains(ListRequest.ListReturnOption.SUBSCRIBED)) {
             return Flux.from(Throwing.supplier(() -> subscriptionManager.subscriptionsReactive(mailboxSession)).get())
                 .collect(ImmutableMap.toImmutableMap(path -> path, path -> path))
-                .flatMap(subscribed -> processWithoutSubscribed(session, request, responder, mailboxSession, isRelative, mailboxQuery, subscribed::containsKey));
+                .flatMap(subscribed -> processWithoutSubscribed(session, request, responder, mailboxSession, patterns, subscribed::containsKey));
         } else {
-            return processWithoutSubscribed(session, request, responder, mailboxSession, isRelative, mailboxQuery, any -> false);
+            return processWithoutSubscribed(session, request, responder, mailboxSession, patterns, any -> false);
         }
     }
 
     private Mono<Void> processWithoutSubscribed(ImapSession session, T request, Responder responder, MailboxSession mailboxSession,
-                                                boolean isRelative, MailboxQuery mailboxQuery, Predicate<MailboxPath> isSubscribed) {
-        return getMailboxManager().search(mailboxQuery, Minimal, mailboxSession)
-            .doOnNext(metaData -> {
+                                                List<ListPattern> patterns, Predicate<MailboxPath> isSubscribed) {
+        return search(patterns, mailboxSession)
+            .doOnNext(matched -> {
+                MailboxMetaData metaData = matched.metaData();
                 MailboxType mailboxType = getMailboxType(request, session, metaData.getPath());
                 if (!request.getSelectOptions().contains(SPECIAL_USE) || mailboxType.getRfc6154attributeName() != null) {
-                    pathConverterFactory.forSession(session).mailboxName(isRelative, metaData.getPath(), mailboxSession)
+                    pathConverterFactory.forSession(session).mailboxName(matched.pattern().isRelative(), metaData.getPath(), mailboxSession)
                             .ifPresent(mailboxName -> responder.respond(
                                 createResponse(metaData.inferiors(),
                                     metaData.getSelectability(),
@@ -225,8 +266,8 @@ public class ListProcessor<T extends ListRequest> extends AbstractMailboxProcess
                                     isSubscribed.test(metaData.getPath()))));
                 }
             })
-            .doOnNext(metaData -> respondMyRights(request, responder, mailboxSession, metaData, isRelative))
-            .concatMap(metaData -> request.getStatusDataItems().map(statusDataItems -> statusProcessor.sendStatus(retrieveMessageManager(metaData, mailboxSession), statusDataItems, responder, session, mailboxSession)).orElse(Mono.empty()))
+            .doOnNext(matched -> respondMyRights(request, responder, mailboxSession, matched.metaData(), matched.pattern().isRelative()))
+            .concatMap(matched -> request.getStatusDataItems().map(statusDataItems -> statusProcessor.sendStatus(retrieveMessageManager(matched.metaData(), mailboxSession), statusDataItems, responder, session, mailboxSession)).orElse(Mono.empty()))
             .then();
     }
 
@@ -238,63 +279,55 @@ public class ListProcessor<T extends ListRequest> extends AbstractMailboxProcess
         }
     }
 
-    private Mono<Void> processWithSubscribed(ImapSession session, T request, Responder responder, MailboxSession mailboxSession, boolean isRelative, MailboxQuery mailboxQuery) {
-        return Mono.zip(getMailboxManager().search(mailboxQuery, Minimal, mailboxSession).collectList()
-                    .map(searchedResultList -> searchedResultList.stream().collect(Collectors.toMap(MailboxMetaData::getPath, Function.identity()))),
+    private Mono<Void> processWithSubscribed(ImapSession session, T request, Responder responder, MailboxSession mailboxSession, List<ListPattern> patterns) {
+        return Mono.zip(search(patterns, mailboxSession)
+                    .collectMap(matched -> matched.metaData().getPath(), Function.identity(), LinkedHashMap::new),
                 Flux.from(Throwing.supplier(() -> subscriptionManager.subscriptionsReactive(mailboxSession)).get()).collectList())
-            .map(tuple -> getListResponseForSelectSubscribed(session, tuple.getT1(), tuple.getT2(), request, mailboxSession, isRelative, mailboxQuery))
+            .map(tuple -> getListResponseForSelectSubscribed(session, tuple.getT1(), tuple.getT2(), request, mailboxSession, patterns))
             .flatMapIterable(list -> list)
             .doOnNext(pathAndResponse -> responder.respond(pathAndResponse.getMiddle()))
-            .doOnNext(pathAndResponse -> pathAndResponse.getRight().ifPresent(mailboxMetaData -> respondMyRights(request, responder, mailboxSession, mailboxMetaData, isRelative)))
+            .doOnNext(pathAndResponse -> pathAndResponse.getRight().ifPresent(matched -> respondMyRights(request, responder, mailboxSession, matched.metaData(), matched.pattern().isRelative())))
             .concatMap(pathAndResponse -> sendStatusWhenSubscribed(session, request, responder, mailboxSession, pathAndResponse))
             .then();
     }
 
     private Mono<MailboxStatusResponse> sendStatusWhenSubscribed(ImapSession session, T request, Responder responder, MailboxSession mailboxSession,
-                                                                 Triple<MailboxPath, ListResponse, Optional<MailboxMetaData>> pathAndResponse) {
+                                                                 Triple<MailboxPath, ListResponse, Optional<Matched>> pathAndResponse) {
         return pathAndResponse.getRight()
-            .map(metaData -> retrieveMessageManager(metaData, mailboxSession))
+            .map(matched -> retrieveMessageManager(matched.metaData(), mailboxSession))
             .flatMap(messageManager -> request.getStatusDataItems()
                 .map(statusDataItems -> statusProcessor.sendStatus(messageManager, statusDataItems, responder, session, mailboxSession)))
             .orElse(Mono.empty());
     }
 
-    private List<Triple<MailboxPath, ListResponse, Optional<MailboxMetaData>>> getListResponseForSelectSubscribed(ImapSession session, Map<MailboxPath, MailboxMetaData> searchedResultMap, List<MailboxPath> allSubscribedSearch,
-                                                                                     ListRequest listRequest, MailboxSession mailboxSession, boolean relative, MailboxQuery mailboxQuery) {
-        ImmutableList.Builder<Triple<MailboxPath, ListResponse, Optional<MailboxMetaData>>> responseBuilders = ImmutableList.builder();
-        List<Pair<MailboxPath, ListResponse>> listRecursiveMatch = listRecursiveMatch(session, searchedResultMap, allSubscribedSearch, mailboxSession, relative, listRequest);
+    private List<Triple<MailboxPath, ListResponse, Optional<Matched>>> getListResponseForSelectSubscribed(ImapSession session, Map<MailboxPath, Matched> searchedResultMap, List<MailboxPath> allSubscribedSearch,
+                                                                                     ListRequest listRequest, MailboxSession mailboxSession, List<ListPattern> patterns) {
+        PathConverter pathConverter = pathConverterFactory.forSession(session);
+        Map<MailboxPath, ListPattern> listedSubscriptions = new LinkedHashMap<>();
+        allSubscribedSearch.forEach(subscribed -> patterns.stream()
+            .filter(pattern -> pattern.matches(subscribed, pathConverter, mailboxSession))
+            .findFirst()
+            .ifPresent(pattern -> listedSubscriptions.put(subscribed, pattern)));
+
+        ImmutableList.Builder<Triple<MailboxPath, ListResponse, Optional<Matched>>> responseBuilders = ImmutableList.builder();
+        List<Pair<MailboxPath, ListResponse>> listRecursiveMatch = listRecursiveMatch(session, searchedResultMap, allSubscribedSearch, listedSubscriptions.keySet(), mailboxSession, listRequest);
 
         listRecursiveMatch.forEach(pair -> responseBuilders.add(Triple.of(pair.getLeft(), pair.getRight(), Optional.ofNullable(searchedResultMap.get(pair.getLeft())))));
         Set<MailboxPath> listRecursiveMatchPath = listRecursiveMatch.stream().map(Pair::getKey).collect(Collectors.toUnmodifiableSet());
 
-        Predicate<MailboxPath> subscribedPredicate = subscribedPredicate(mailboxSession, relative, listRequest);
-
-        allSubscribedSearch.stream()
-            .filter(subscribed -> !listRecursiveMatchPath.contains(subscribed))
-            .filter(mailboxQuery::isPathMatch)
-            .filter(subscribedPredicate)
-            .flatMap(subscribed -> buildListResponse(listRequest, searchedResultMap, session, relative, subscribed).stream())
+        listedSubscriptions.entrySet().stream()
+            .filter(subscribed -> !listRecursiveMatchPath.contains(subscribed.getKey()))
+            .flatMap(subscribed -> buildListResponse(listRequest, searchedResultMap, session, subscribed.getValue().isRelative(), subscribed.getKey()).stream())
             .filter(pair -> !listRequest.getSelectOptions().contains(SPECIAL_USE) || mailboxTyper.getMailboxType(session, pair.getKey()).getRfc6154attributeName() != null)
             .forEach(pair -> responseBuilders.add(Triple.of(pair.getLeft(), pair.getRight(), Optional.ofNullable(searchedResultMap.get(pair.getLeft())))));
 
         return responseBuilders.build();
     }
 
-    private Predicate<MailboxPath> subscribedPredicate(MailboxSession mailboxSession, boolean isRelative, ListRequest request) {
-        MailboxNameExpression subscribeExpression = new PrefixedRegex(
-            request.getBaseReferenceName(),
-            ModifiedUtf7.decodeModifiedUTF7(request.getMailboxPattern()),
-            mailboxSession.getPathDelimiter());
-
-        PathConverter pathConverter = pathConverterFactory.forSession(mailboxSession);
-
-        return subscribedMailboxPath -> pathConverter.mailboxName(isRelative, subscribedMailboxPath, mailboxSession)
-            .map(subscribeExpression::isExpressionMatch).orElse(false);
-    }
-
-    private Optional<Pair<MailboxPath, ListResponse>> buildListResponse(ListRequest listRequest, Map<MailboxPath, MailboxMetaData> searchedResultMap, ImapSession session, boolean relative, MailboxPath subscribed) {
+    private Optional<Pair<MailboxPath, ListResponse>> buildListResponse(ListRequest listRequest, Map<MailboxPath, Matched> searchedResultMap, ImapSession session, boolean relative, MailboxPath subscribed) {
         return pathConverterFactory.forSession(session).mailboxName(relative, subscribed, session.getMailboxSession())
             .map(name -> Pair.of(subscribed, Optional.ofNullable(searchedResultMap.get(subscribed))
+            .map(Matched::metaData)
             .map(mailboxMetaData -> ListResponse.builder()
                 .returnSubscribed(RETURN_SUBSCRIBED)
                 .forMetaData(mailboxMetaData)
@@ -305,22 +338,27 @@ public class ListProcessor<T extends ListRequest> extends AbstractMailboxProcess
             .build()));
     }
 
-    private List<Pair<MailboxPath, ListResponse>> listRecursiveMatch(ImapSession session, Map<MailboxPath, MailboxMetaData> searchedResultMap,
-                                                                     List<MailboxPath> allSubscribedSearch, MailboxSession mailboxSession,
-                                                                     boolean relative, ListRequest listRequest) {
+    /**
+     * RFC 5258 3.5: a matching mailbox gets CHILDINFO when a descendant is subscribed, but only for a descendant
+     * that is not listed itself, as a redundant CHILDINFO SHOULD be suppressed.
+     */
+    private List<Pair<MailboxPath, ListResponse>> listRecursiveMatch(ImapSession session, Map<MailboxPath, Matched> searchedResultMap,
+                                                                     List<MailboxPath> allSubscribedSearch, Set<MailboxPath> listedSubscriptions,
+                                                                     MailboxSession mailboxSession, ListRequest listRequest) {
         if (!listRequest.getSelectOptions().contains(RECURSIVEMATCH)) {
             return List.of();
         }
 
-        Set<MailboxPath> allSubscribedSearchParent = allSubscribedSearch.stream()
+        Set<MailboxPath> unlistedSubscriptionParents = allSubscribedSearch.stream()
+            .filter(subscribed -> !listedSubscriptions.contains(subscribed))
             .flatMap(mailboxPath -> mailboxPath.getParents(mailboxSession.getPathDelimiter()).stream())
             .collect(Collectors.toSet());
 
         return searchedResultMap.entrySet().stream()
-            .filter(pair -> allSubscribedSearchParent.contains(pair.getKey()))
+            .filter(pair -> unlistedSubscriptionParents.contains(pair.getKey()))
             .flatMap(pair -> {
-                MailboxMetaData metaData = pair.getValue();
-                Optional<String> maybeMailboxName = pathConverterFactory.forSession(session).mailboxName(relative, metaData.getPath(), mailboxSession);
+                MailboxMetaData metaData = pair.getValue().metaData();
+                Optional<String> maybeMailboxName = pathConverterFactory.forSession(session).mailboxName(pair.getValue().pattern().isRelative(), metaData.getPath(), mailboxSession);
                 return maybeMailboxName.map(mailboxName -> Pair.of(pair.getKey(), ListResponse.builder()
                     .forMetaData(metaData)
                     .name(mailboxName)
@@ -371,7 +409,7 @@ public class ListProcessor<T extends ListRequest> extends AbstractMailboxProcess
         return MDCBuilder.create()
             .addToContext(MDCBuilder.ACTION, "LIST")
             .addToContext("base", request.getBaseReferenceName())
-            .addToContext("pattern", request.getMailboxPattern())
+            .addToContext("pattern", String.join(" ", request.getMailboxPatterns()))
             .addToContext("returnOptions", request.getReturnOptions().toString())
             .addToContext("selectOptions", request.getSelectOptions().toString())
             .addToContextIfPresent("statusItems", request.getStatusDataItems().map(StatusDataItems::toString));

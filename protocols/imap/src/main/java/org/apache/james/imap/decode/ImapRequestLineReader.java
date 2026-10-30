@@ -494,7 +494,7 @@ public abstract class ImapRequestLineReader {
         try {
             return ModifiedUtf7.decodeModifiedUTF7(mailboxUTF7);
         } catch (MalformedUtf7Exception e) {
-            throw new DecodingException(HumanReadableText.ILLEGAL_ARGUMENTS, "Invalid mailbox name: not a valid modified UTF-7 value", e);
+            throw DecodingException.no(HumanReadableText.INVALID_MAILBOX_NAME, "Invalid mailbox name: not a valid modified UTF-7 value", e);
         }
     }
 

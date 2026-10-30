@@ -72,6 +72,9 @@ public abstract class AbstractImapCommandParser implements ImapCommandParser {
                 return decode(request, tag, session);
             } catch (DecodingException e) {
                 session.withMDC(() -> LOGGER.info("Cannot parse protocol ", e));
+                if (e.isAnsweredNo()) {
+                    return statusResponseFactory.taggedNo(tag, command, e.getKey());
+                }
                 return statusResponseFactory.taggedBad(tag, command, e.getKey());
             }
         }

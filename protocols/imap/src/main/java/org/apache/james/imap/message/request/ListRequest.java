@@ -19,6 +19,7 @@
 package org.apache.james.imap.message.request;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Optional;
 
 import org.apache.james.imap.api.ImapCommand;
@@ -27,6 +28,7 @@ import org.apache.james.imap.api.Tag;
 import org.apache.james.imap.api.message.StatusDataItems;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
 
 public class ListRequest extends AbstractImapRequest {
 
@@ -52,31 +54,61 @@ public class ListRequest extends AbstractImapRequest {
     }
 
     private final String baseReferenceName;
-    private final String mailboxPattern;
+    private final ImmutableList<String> mailboxPatterns;
+    private final boolean extended;
     private final EnumSet<ListSelectOption> selectOptions;
     private final EnumSet<ListReturnOption> returnOptions;
     private final Optional<StatusDataItems> statusDataItems;
 
     public ListRequest(String referenceName, String mailboxPattern, Tag tag) {
-        this(ImapConstants.LIST_COMMAND, referenceName, mailboxPattern, tag, EnumSet.noneOf(ListSelectOption.class), EnumSet.noneOf(ListReturnOption.class), Optional.empty());
+        this(ImapConstants.LIST_COMMAND, referenceName, mailboxPattern, tag);
     }
 
-    public ListRequest(ImapCommand imapCommand, String referenceName, String mailboxPattern, Tag tag,
+    protected ListRequest(ImapCommand imapCommand, String referenceName, String mailboxPattern, Tag tag) {
+        this(imapCommand, referenceName, ImmutableList.of(mailboxPattern), false, tag,
+            EnumSet.noneOf(ListSelectOption.class), EnumSet.noneOf(ListReturnOption.class), Optional.empty());
+    }
+
+    /**
+     * An extended LIST (RFC 5258): selection options, return options or a parenthesized list of patterns.
+     */
+    public ListRequest(ImapCommand imapCommand, String referenceName, List<String> mailboxPatterns, Tag tag,
                        EnumSet<ListSelectOption> selectOptions, EnumSet<ListReturnOption> returnOptions, Optional<StatusDataItems> statusDataItems) {
+        this(imapCommand, referenceName, mailboxPatterns, true, tag, selectOptions, returnOptions, statusDataItems);
+    }
+
+    private ListRequest(ImapCommand imapCommand, String referenceName, List<String> mailboxPatterns, boolean extended, Tag tag,
+                        EnumSet<ListSelectOption> selectOptions, EnumSet<ListReturnOption> returnOptions, Optional<StatusDataItems> statusDataItems) {
         super(tag, imapCommand);
         this.baseReferenceName = referenceName;
-        this.mailboxPattern = mailboxPattern;
+        this.mailboxPatterns = ImmutableList.copyOf(mailboxPatterns);
+        this.extended = extended;
         this.selectOptions = selectOptions;
         this.returnOptions = returnOptions;
         this.statusDataItems = statusDataItems;
     }
 
+    /**
+     * The reference name, modified UTF-7 encoded.
+     */
     public final String getBaseReferenceName() {
         return baseReferenceName;
     }
 
-    public final String getMailboxPattern() {
-        return mailboxPattern;
+    /**
+     * The mailbox patterns, modified UTF-7 encoded. A pattern that is not valid modified UTF-7 matches no
+     * mailbox name.
+     */
+    public final ImmutableList<String> getMailboxPatterns() {
+        return mailboxPatterns;
+    }
+
+    /**
+     * RFC 3501's request for the hierarchy delimiter: a LIST with the empty pattern. RFC 5258 3: an extended
+     * LIST never is one.
+     */
+    public boolean isHierarchyDelimiterRequest() {
+        return !extended && mailboxPatterns.equals(ImmutableList.of(""));
     }
 
     public EnumSet<ListSelectOption> getSelectOptions() {
@@ -103,7 +135,7 @@ public class ListRequest extends AbstractImapRequest {
     public String toString() {
         return MoreObjects.toStringHelper(this)
             .add("baseReferenceName", baseReferenceName)
-            .add("mailboxPattern", mailboxPattern)
+            .add("mailboxPatterns", mailboxPatterns)
             .add("selectOptions", selectOptions)
             .add("returnOptions", returnOptions)
             .add("statusDataItem", statusDataItems.orElse(null))

@@ -101,13 +101,55 @@ S: A232 OK SUBSCRIBE completed.
 C: A233 SUBSCRIBE another1
 S: A233 OK SUBSCRIBE completed.
 
+# RFC 5258 3.5: no CHILDINFO for listtest1, as its subscribed child is listed itself
 C: A24 LIST (RECURSIVEMATCH SUBSCRIBED) "" "*1"
 SUB {
-S: \* LIST \(\\HasChildren\) \"\.\" "listtest1" \(\"CHILDINFO\" \(\"SUBSCRIBED\"\)\)
 S: \* LIST \(\\HasNoChildren \\Subscribed\) \"\.\" "listtest1.subfolder1"
 S: \* LIST \(\\HasNoChildren \\Subscribed\) \"\.\" "another1"
 }
 S: A24 OK LIST completed.
+
+# RFC 5258 3: a mailbox matching several of the patterns is listed once, and the empty pattern is ignored
+C: A241 LIST "" ("listtest*" "*1" "")
+SUB {
+S: \* LIST \(\\HasChildren\) \"\.\" "listtest"
+S: \* LIST \(\\HasNoChildren\) \"\.\" "listtest.subfolder"
+S: \* LIST \(\\HasChildren\) \"\.\" "listtest1"
+S: \* LIST \(\\HasNoChildren\) \"\.\" "listtest1.subfolder1"
+S: \* LIST \(\\HasNoChildren\) \"\.\" "another1"
+}
+S: A241 OK LIST completed.
+
+C: A2411 LIST "" (listtest.* *1)
+SUB {
+S: \* LIST \(\\HasNoChildren\) \"\.\" "listtest.subfolder"
+S: \* LIST \(\\HasChildren\) \"\.\" "listtest1"
+S: \* LIST \(\\HasNoChildren\) \"\.\" "listtest1.subfolder1"
+S: \* LIST \(\\HasNoChildren\) \"\.\" "another1"
+}
+S: A2411 OK LIST completed.
+
+C: A242 LIST (RECURSIVEMATCH SUBSCRIBED) "" ("listtest" "nothing")
+S: \* LIST \(\\HasChildren\) \"\.\" "listtest" \(\"CHILDINFO\" \(\"SUBSCRIBED\"\)\)
+S: A242 OK LIST completed.
+
+C: A243 LIST (RECURSIVEMATCH SUBSCRIBED) "" ("listtest" "listtest.subfolder")
+S: \* LIST \(\\HasNoChildren \\Subscribed\) \"\.\" "listtest.subfolder"
+S: A243 OK LIST completed.
+
+# RFC 5258 3: an extended LIST does not take the empty pattern for a request of the hierarchy delimiter
+C: A244 LIST "" ("")
+S: A244 OK LIST completed.
+
+C: A245 LIST () "" ""
+S: A245 OK LIST completed.
+
+# RFC 5258 3: RECURSIVEMATCH alone, or with REMOTE only, is answered BAD
+C: A246 LIST (RECURSIVEMATCH) "" "*"
+S: A246 BAD LIST failed. Illegal arguments.
+
+C: A247 LIST (RECURSIVEMATCH REMOTE) "" "*"
+S: A247 BAD LIST failed. Illegal arguments.
 
 C: A25 UNSUBSCRIBE listtest1.subfolder1
 S: A25 OK UNSUBSCRIBE completed.
