@@ -1,19 +1,17 @@
 {
   "imaptest_scripted": {
     "base": [
-      1,
+      0,
       460
     ],
     "extensions": [
       0,
       88
     ],
-    "failing": [
-      "fetch-body-message-rfc822-mime command 7/14"
-    ],
+    "failing": [],
     "groups": [
       74,
-      1,
+      0,
       37
     ]
   },

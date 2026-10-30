@@ -64,16 +64,12 @@ public class MimeBodyElement implements BodyElement {
         return name;
     }
 
-    protected long calculateSize(List<Header> headers) {
-        if (headers.isEmpty()) {
-            return 0;
-        } else {
-            long count = 0;
-            for (Header header : headers) {
-                count += header.size() + ImapConstants.LINE_END.length();
-            }
-            return count + ImapConstants.LINE_END.length();
+    private static long calculateSize(List<Header> headers) {
+        long count = 0;
+        for (Header header : headers) {
+            count += header.size() + ImapConstants.LINE_END.length();
         }
+        return count + ImapConstants.LINE_END.length();
     }
 
     @Override
@@ -91,7 +87,7 @@ public class MimeBodyElement implements BodyElement {
             out.write(header.getValue().getBytes(US_ASCII));
             out.write(LINE_END_BYTES);
         }
-        // no empty line with CRLF for MIME headers. See IMAP-297
+        // HeaderBodyElement#noBody drops the empty line of an empty header
         if (size > 0) {
             out.write(ImapConstants.LINE_END.getBytes());
         }

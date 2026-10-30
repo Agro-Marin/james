@@ -82,3 +82,41 @@ S: Content-Type: TEXT/PLAIN; CHARSET=US-ASCII
 S:
 S: \)
 S: f1 OK FETCH completed.
+
+# a part with an empty header has an empty MIME header, and a missing part none
+C: f2 APPEND selected {212+}
+C: From: user@domain.org
+C: Subject: empty part header
+C: Mime-Version: 1.0
+C: Content-Type: multipart/mixed; boundary="foo"
+C:
+C: --foo
+C:
+C: part with an empty header
+C: --foo
+C: Content-Type: text/plain
+C:
+C: second part
+C: --foo--
+C:
+S: \* 5 EXISTS
+S: \* 5 RECENT
+S: f2 OK (\[.+\] )?APPEND completed.
+
+C: f3 FETCH 5 (BODY.PEEK[1.MIME])
+S: \* 5 FETCH \(BODY\[1.MIME\] \{2\}
+S:
+S: \)
+S: f3 OK FETCH completed.
+
+C: f4 FETCH 5 (BODY.PEEK[2.MIME])
+S: \* 5 FETCH \(BODY\[2.MIME\] \{28\}
+S: Content-Type: text/plain
+S:
+S: \)
+S: f4 OK FETCH completed.
+
+C: f5 FETCH 5 (BODY.PEEK[3.MIME])
+S: \* 5 FETCH \(BODY\[3.MIME\] \{0\}
+S: \)
+S: f5 OK FETCH completed.

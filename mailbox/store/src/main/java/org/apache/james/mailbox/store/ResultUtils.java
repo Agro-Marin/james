@@ -246,8 +246,7 @@ public class ResultUtils {
             throws IOException, MimeException {
         int[] path = path(mimePath);
         if (path != null) {
-            List<Header> headers = locate(path, message).map(MimePart::mimeHeaders).orElse(List.of());
-            messageResult.setMimeHeaders(mimePath, headers.iterator());
+            messageResult.setMimeHeaders(mimePath, locate(path, message).map(part -> part.mimeHeaders().iterator()).orElse(null));
         }
     }
 

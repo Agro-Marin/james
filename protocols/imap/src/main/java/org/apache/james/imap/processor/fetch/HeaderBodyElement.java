@@ -24,7 +24,6 @@ package org.apache.james.imap.processor.fetch;
 
 import java.util.List;
 
-import org.apache.james.imap.api.ImapConstants;
 import org.apache.james.imap.message.response.FetchResponse.BodyElement;
 import org.apache.james.mailbox.model.Header;
 
@@ -45,17 +44,6 @@ public class HeaderBodyElement extends MimeBodyElement {
         if (headers.isEmpty()) {
             size = 0;
         }
-    }
-
-    @Override
-    protected long calculateSize(List<Header> headers) {
-        if (headers.isEmpty()) {
-            // even if the headers are empty we need to include the headers body
-            // separator
-            // See IMAP-294
-            return ImapConstants.LINE_END.length();
-        }
-        return super.calculateSize(headers);
     }
 
 }

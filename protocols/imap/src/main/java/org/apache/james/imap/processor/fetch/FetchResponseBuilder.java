@@ -351,8 +351,10 @@ public final class FetchResponseBuilder {
 
     private FetchResponse.BodyElement mimeHeaders(MessageResult messageResult, String name, Optional<MimePath> path) throws MailboxException {
         final Iterator<Header> headers = getMimeHeaders(messageResult, path);
-        List<Header> lines = MessageResultUtils.getAll(headers);
-        return new MimeBodyElement(name, lines);
+        if (headers == null) {
+            return new ContentBodyElement(name, new EmptyContent());
+        }
+        return new MimeBodyElement(name, MessageResultUtils.getAll(headers));
     }
 
     private HeaderBodyElement headerBodyElement(MessageResult messageResult, String name, List<Header> lines, Optional<MimePath> path) throws MailboxException {
