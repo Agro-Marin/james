@@ -2,7 +2,9 @@
 
 JUnit counts (tests run, skipped) and imaptest's scripted results are exact in both directions, failing tests included:
 a test that starts or stops failing moves a floor, in the same commit. Stress violations depend on how clients interleave,
-so each kind has a ceiling instead, set by hand; --update leaves those alone. Every failing test needs a reason in floors.json.
+so each kind has a ceiling instead, set by hand; --update leaves those alone. James's own log under imaptest is held the
+same way: its errors, and the warnings that report a broken invariant, which imaptest cannot see. Every failing test needs
+a reason in floors.json.
 """
 
 import argparse
@@ -17,6 +19,12 @@ SCRIPTED_SUMMARY = {
     "base": re.compile(r"^base protocol: (\d+)/(\d+) individual commands failed", re.M),
     "extensions": re.compile(r"^extensions: (\d+)/(\d+) individual commands failed", re.M),
 }
+
+
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+LOG_LINE = re.compile(r"\[(ERROR|WARN) ?\] (\S+) - (.*)")
+# A usage below zero means a message was counted out twice; a negative quota lets a mailbox grow past it.
+GATED_WARNINGS = ("Invalid quota usage",)
 
 
 def junit(run):
@@ -68,6 +76,21 @@ def stress(log):
     return dict(sorted(kinds.items()))
 
 
+def james_log(log):
+    kinds = {}
+    for line in log.read_text(errors="replace").splitlines():
+        match = LOG_LINE.search(ANSI.sub("", line))
+        if not match:
+            continue
+        level, logger, message = match.groups()
+        if level == "WARN" and not message.startswith(GATED_WARNINGS):
+            continue
+        message = re.sub(r"\d+", "N", re.sub(r"[0-9a-f]{8}-[0-9a-f-]{27}", "X", message))
+        kind = f"{level} {logger} - {message[:70]}"
+        kinds[kind] = kinds.get(kind, 0) + 1
+    return dict(sorted(kinds.items()))
+
+
 def measure(run):
     counts, failing = junit(run)
     result = {"junit": counts, "junit_failing": failing}
@@ -75,6 +98,8 @@ def measure(run):
         result["imaptest_scripted"] = scripted(run / "imaptest-scripted.log")
     if (run / "imaptest-stress.log").exists():
         result["imaptest_stress"] = stress(run / "imaptest-stress.log")
+    if (run / "james" / "james.out").exists():
+        result["james_log"] = james_log(run / "james" / "james.out")
     return result
 
 
@@ -122,6 +147,11 @@ def compare(result, floors):
                 problems.append(f"imaptest stress: new kind of violation {kind!r} x{count}")
             elif count > ceilings[kind]:
                 problems.append(f"imaptest stress {kind!r}: {count} above its ceiling {ceilings[kind]}")
+    if "james_log" in result:
+        ceilings = floors.get("james_log_ceilings", {})
+        for kind, count in result["james_log"].items():
+            if count > ceilings.get(kind, 0):
+                problems.append(f"james log {kind!r}: {count} above its ceiling {ceilings.get(kind, 0)}")
     reasons = floors.get("reasons", {})
     failures = [t for stage in result["junit_failing"].values() for t in stage]
     failures += result.get("imaptest_scripted", {}).get("failing", [])
@@ -165,6 +195,8 @@ def main():
               f"base {s['base'][0]}/{s['base'][1]}, extensions {s['extensions'][0]}/{s['extensions'][1]} failed")
     if "imaptest_stress" in result:
         print(f"imaptest stress: {sum(result['imaptest_stress'].values())} violations {result['imaptest_stress']}")
+    if "james_log" in result:
+        print(f"james log: {sum(result['james_log'].values())} errors and gated warnings {result['james_log']}")
     for problem in problems:
         print(f"FLOOR {problem}")
     print("lane: green" if not problems else f"lane: red, {len(problems)} off floor")

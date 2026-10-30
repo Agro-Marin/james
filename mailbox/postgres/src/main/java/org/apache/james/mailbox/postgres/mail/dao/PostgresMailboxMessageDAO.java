@@ -310,27 +310,6 @@ public class PostgresMailboxMessageDAO {
             limit, fetchType);
     }
 
-    public Flux<SimpleMailboxMessage.Builder> findMessagesByMailboxIdAndUIDs(PostgresMailboxId mailboxId, List<MessageUid> uids) {
-        if (uids.isEmpty()) {
-            return Flux.empty();
-        }
-        PostgresMailboxMessageFetchStrategy fetchStrategy = PostgresMailboxMessageFetchStrategy.METADATA;
-        Function<List<MessageUid>, Flux<SimpleMailboxMessage.Builder>> queryPublisherFunction =
-            uidsToFetch -> postgresExecutor.executeRows(dslContext -> Flux.from(dslContext.select(fetchStrategy.fetchFields())
-                    .from(MESSAGES_JOIN_MAILBOX_MESSAGES_CONDITION_STEP)
-                    .where(MAILBOX_ID.eq(mailboxId.asUuid()))
-                    .and(MESSAGE_UID.in(uidsToFetch.stream().map(MessageUid::asLong).toArray(Long[]::new)))
-                    .orderBy(DEFAULT_SORT_ORDER_BY)), EAGER_FETCH)
-                .map(fetchStrategy.toMessageBuilder());
-
-        if (uids.size() <= IN_CLAUSE_MAX_SIZE) {
-            return queryPublisherFunction.apply(uids);
-        } else {
-            return Flux.fromIterable(Iterables.partition(uids, IN_CLAUSE_MAX_SIZE))
-                .flatMap(queryPublisherFunction);
-        }
-    }
-
     public Flux<MessageUid> findDeletedMessagesByMailboxId(PostgresMailboxId mailboxId) {
         return listUidsPaginated(MAILBOX_ID.eq(mailboxId.asUuid())
             .and(IS_DELETED.eq(true)));

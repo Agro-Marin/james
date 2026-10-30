@@ -94,7 +94,7 @@
       },
       "mailbox/postgres": {
         "skipped": 12,
-        "tests": 781
+        "tests": 782
       },
       "mpt/impl/imap-mailbox/postgres": {
         "skipped": 0,

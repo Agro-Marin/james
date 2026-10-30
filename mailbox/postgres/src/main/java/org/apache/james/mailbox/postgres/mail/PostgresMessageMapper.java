@@ -211,13 +211,12 @@ public class PostgresMessageMapper implements MessageMapper {
         return deleteMessagesReactive(mailbox, uids).block();
     }
 
+    // The rows the DELETE returns, not those read before it: a message another session deletes in between is that
+    // session's to report, once.
     @Override
     public Mono<Map<MessageUid, MessageMetaData>> deleteMessagesReactive(Mailbox mailbox, List<MessageUid> uids) {
-        return mailboxMessageDAO.findMessagesByMailboxIdAndUIDs((PostgresMailboxId) mailbox.getMailboxId(), uids)
-            .map(SimpleMailboxMessage.Builder::build)
-            .collectMap(MailboxMessage::getUid, MailboxMessage::metaData)
-            .flatMap(map -> mailboxMessageDAO.deleteByMailboxIdAndMessageUids((PostgresMailboxId) mailbox.getMailboxId(), uids)
-                .then(Mono.just(map)));
+        return mailboxMessageDAO.deleteByMailboxIdAndMessageUids((PostgresMailboxId) mailbox.getMailboxId(), uids)
+            .collectMap(MessageMetaData::getUid);
     }
 
     @Override
