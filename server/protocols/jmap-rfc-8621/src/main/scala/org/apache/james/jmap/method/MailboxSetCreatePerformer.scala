@@ -30,7 +30,7 @@ import org.apache.james.jmap.routes.{ProcessingContext, SessionSupplier}
 import org.apache.james.jmap.utils.quotas.QuotaLoaderWithPreloadedDefaultFactory
 import org.apache.james.mailbox.exception.{InsufficientRightsException, MailboxExistsException, MailboxNameException, MailboxNotFoundException}
 import org.apache.james.mailbox.model.{MailboxId, MailboxPath}
-import org.apache.james.mailbox.{MailboxManager, MailboxSession, SubscriptionManager}
+import org.apache.james.mailbox.{MailboxManager, MailboxSession}
 import org.apache.james.metrics.api.MetricFactory
 import org.apache.james.util.ReactorUtils
 import org.slf4j.LoggerFactory
@@ -87,7 +87,7 @@ object MailboxSetCreatePerformer {
 
 class MailboxSetCreatePerformer @Inject()(serializer: MailboxSerializer,
                                           mailboxManager: MailboxManager,
-                                          subscriptionManager: SubscriptionManager,
+                                          mailboxSubscriptions: MailboxSubscriptions,
                                           mailboxIdFactory: MailboxId.Factory,
                                           quotaFactory : QuotaLoaderWithPreloadedDefaultFactory,
                                           val metricFactory: MetricFactory,
@@ -187,7 +187,7 @@ class MailboxSetCreatePerformer @Inject()(serializer: MailboxSerializer,
 
       val defaultSubscribed = IsSubscribed(true)
       if (mailboxCreationRequest.isSubscribed.getOrElse(defaultSubscribed).value) {
-        subscriptionManager.subscribe(mailboxSession, path)
+        mailboxSubscriptions.subscribeWithParents(mailboxSession, path)
       }
 
       mailboxCreationRequest.rights

@@ -32,7 +32,7 @@ import org.apache.james.mailbox.MailboxManager.{MailboxSearchFetchType, RenameOp
 import org.apache.james.mailbox.exception.{DifferentDomainException, InsufficientRightsException, MailboxExistsException, MailboxNameException, MailboxNotFoundException}
 import org.apache.james.mailbox.model.search.{MailboxQuery, PrefixedWildcard}
 import org.apache.james.mailbox.model.{MailboxId, MailboxPath}
-import org.apache.james.mailbox.{DefaultMailboxes, MailboxManager, MailboxSession, MessageManager, Role, SubscriptionManager}
+import org.apache.james.mailbox.{DefaultMailboxes, MailboxManager, MailboxSession, MessageManager, Role}
 import org.apache.james.util.{AuditTrail, ReactorUtils}
 import org.slf4j.LoggerFactory
 import reactor.core.scala.publisher.{SFlux, SMono}
@@ -110,7 +110,7 @@ object MailboxSetUpdatePerformer {
 
 class MailboxSetUpdatePerformer @Inject()(serializer: MailboxSerializer,
                                           mailboxManager: MailboxManager,
-                                          subscriptionManager: SubscriptionManager,
+                                          mailboxSubscriptions: MailboxSubscriptions,
                                           mailboxIdFactory: MailboxId.Factory) {
 
   def updateMailboxes(mailboxSession: MailboxSession,
@@ -150,9 +150,9 @@ class MailboxSetUpdatePerformer @Inject()(serializer: MailboxSerializer,
         val shouldSubscribe = isSubscribedUpdate.isSubscribed.map(_.value).getOrElse(isOwner)
 
         if (shouldSubscribe) {
-          subscriptionManager.subscribe(mailboxSession, messageManager.getMailboxPath)
+          mailboxSubscriptions.subscribeWithParents(mailboxSession, messageManager.getMailboxPath)
         } else {
-          subscriptionManager.unsubscribe(mailboxSession, messageManager.getMailboxPath)
+          mailboxSubscriptions.unsubscribeWithChildren(mailboxSession, messageManager.getMailboxPath)
         }
       }).`then`(SMono.just[MailboxUpdateResult](MailboxUpdateSuccess(mailboxId)))
         .subscribeOn(ReactorUtils.BLOCKING_CALL_WRAPPER)

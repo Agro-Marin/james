@@ -118,7 +118,6 @@ import org.apache.james.mailbox.store.StoreMessageIdManager;
 import org.apache.james.mailbox.store.StoreRightManager;
 import org.apache.james.mailbox.store.StoreSubscriptionManager;
 import org.apache.james.mailbox.store.event.MailboxAnnotationListener;
-import org.apache.james.mailbox.store.event.MailboxSubscriptionListener;
 import org.apache.james.mailbox.store.mail.AttachmentIdAssignationStrategy;
 import org.apache.james.mailbox.store.mail.AttachmentMapperFactory;
 import org.apache.james.mailbox.store.mail.MailboxMapperFactory;
@@ -252,8 +251,6 @@ public class CassandraMailboxModule extends AbstractModule {
 
         Multibinder.newSetBinder(binder(), EventListener.GroupEventListener.class)
             .addBinding().to(MailboxAnnotationListener.class);
-        Multibinder.newSetBinder(binder(), EventListener.GroupEventListener.class)
-            .addBinding().to(MailboxSubscriptionListener.class);
         Multibinder.newSetBinder(binder(), EventListener.ReactiveGroupEventListener.class)
             .addBinding().to(DeleteMessageListener.class);
 

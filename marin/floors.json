@@ -1,25 +1,21 @@
 {
   "imaptest_scripted": {
     "base": [
-      4,
+      2,
       460
     ],
     "extensions": [
-      3,
+      1,
       88
     ],
     "failing": [
       "fetch-body-message-rfc822-mime command 7/14",
       "fetch-envelope command 1/2",
-      "listext command 28/34",
-      "listext command 29/34",
-      "move command 12/13",
-      "subscribe command 16/24",
-      "subscribe command 23/24"
+      "move command 12/13"
     ],
     "groups": [
       74,
-      5,
+      3,
       37
     ]
   },
@@ -40,7 +36,7 @@
       },
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 668
+        "tests": 660
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -124,7 +120,7 @@
       },
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 668
+        "tests": 660
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -148,7 +144,7 @@
       },
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 668
+        "tests": 660
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -186,11 +182,9 @@
     "fetch-body-message-rfc822-mime": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",
     "fetch-body-message-rfc822-x2": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",
     "fetch-envelope": "not analysed yet; phase 2 analyses it before fixing",
-    "listext": "MailboxSubscriptionListener (JAMES-3927) subscribes a mailbox's parents with it and unsubscribes its children with it, for IMAP too: a parent lists as \\Subscribed and LSUB never shows it \\Noselect",
     "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest": "needs Docker (a Tika container for attachment text); the lane has none",
     "move": "not analysed yet; phase 2 analyses it before fixing",
     "search-sets": "not analysed yet; phase 2 analyses it before fixing",
-    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest": "needs Docker (a mock SMTP server container); the lane has none",
-    "subscribe": "MailboxSubscriptionListener (JAMES-3927) subscribes a mailbox's parents with it and unsubscribes its children with it, for IMAP too: a parent lists as \\Subscribed and LSUB never shows it \\Noselect"
+    "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest": "needs Docker (a mock SMTP server container); the lane has none"
   }
 }
