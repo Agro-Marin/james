@@ -173,8 +173,32 @@ class MailboxEventAnalyserTest {
         testee.applyAddedUids();
 
         assertThat(testee.existsCount()).isEqualTo(2);
-        assertThat(testee.recentCount()).isEqualTo(1);
         assertThat(testee.getLastUid()).contains(ADDED_UID);
+    }
+
+    @Test
+    void appliedUidShouldNotBeRecentUntilClaimed() throws Exception {
+        testee.event(ADDED);
+        testee.applyAddedUids();
+
+        assertThat(testee.recentCount()).isZero();
+    }
+
+    @Test
+    void recentFlagRemovedByAnotherSessionShouldNotMakeAMessageRecent() throws Exception {
+        testee.event(EventFactory.flagsUpdated()
+            .randomEventId()
+            .mailboxSession(OTHER_MAILBOX_SESSION)
+            .mailbox(DEFAULT_MAILBOX)
+            .updatedFlag(UpdatedFlags.builder()
+                .uid(MESSAGE_UID)
+                .modSeq(ModSeq.first())
+                .oldFlags(new Flags(Flags.Flag.RECENT))
+                .newFlags(new Flags())
+                .build())
+            .build());
+
+        assertThat(testee.recentCount()).isZero();
     }
 
     @Test
@@ -191,6 +215,7 @@ class MailboxEventAnalyserTest {
     void expungedUidShouldStopBeingRecentWhenRemoved() throws Exception {
         testee.event(ADDED);
         testee.applyAddedUids();
+        testee.addRecent(ADDED_UID);
         testee.event(expunged(ADDED_UID));
         Collection<MessageUid> sent = testee.expungedUids();
         sent.forEach(testee::remove);

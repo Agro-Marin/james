@@ -496,6 +496,8 @@ public class PostgresMailboxMessageDAO {
                 .set(MOD_SEQ, newModSeq.asLong())
                 .where(MAILBOX_ID.eq(mailboxId.asUuid()))
                 .and(MESSAGE_UID.in(uidsMatching.stream().map(MessageUid::asLong).toArray(Long[]::new)))
+                // a row a concurrent reset cleared first is re-checked after its lock and left out: one claim each
+                .and(IS_RECENT.eq(true))
                 .and(MOD_SEQ.notEqual(newModSeq.asLong()))
                 .returning(MESSAGE_METADATA_FIELDS_REQUIRE)))
             .map(RECORD_TO_MESSAGE_METADATA_FUNCTION);

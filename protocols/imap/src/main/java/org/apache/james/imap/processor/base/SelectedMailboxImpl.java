@@ -27,6 +27,7 @@ import static io.vavr.Predicates.instanceOf;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -48,6 +49,7 @@ import org.apache.james.mailbox.FlagsBuilder;
 import org.apache.james.mailbox.MailboxManager;
 import org.apache.james.mailbox.MailboxSession;
 import org.apache.james.mailbox.MessageManager;
+import org.apache.james.mailbox.MessageManager.MailboxMetaData;
 import org.apache.james.mailbox.MessageUid;
 import org.apache.james.mailbox.NullableMessageSequenceNumber;
 import org.apache.james.mailbox.events.MailboxEvents.Added;
@@ -311,9 +313,31 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
             return false;
         }
         uidMsnConverter.addAll(addedUids);
-        recentUids.addAll(addedUids);
         addedUids.clear();
         return true;
+    }
+
+    // RFC 3501 2.3.2: \Recent belongs to the first session notified of a message. The store's flag marks a message no
+    // session has claimed; a session announcing new messages clears it, and those its own reset cleared are its recent.
+    @Override
+    public Mono<Void> claimRecent() {
+        if (readOnly.get()) {
+            return Mono.empty();
+        }
+        return Mono.defer(() -> {
+            try {
+                return messageManager.getMetaDataReactive(MailboxMetaData.RecentMode.RESET, mailboxSession, EnumSet.noneOf(MailboxMetaData.Item.class));
+            } catch (MailboxException e) {
+                return Mono.error(e);
+            }
+        })
+            .doOnNext(metaData -> addRecents(metaData.getRecent()))
+            .onErrorResume(MailboxException.class, e -> Mono.empty())
+            .then();
+    }
+
+    private synchronized void addRecents(List<MessageUid> uids) {
+        recentUids.addAll(uids);
     }
 
     @Override
@@ -486,16 +510,6 @@ public class SelectedMailboxImpl implements SelectedMailbox, EventListener.React
             }
         }
 
-        // We need to add the UID of the message to the recent
-        // list if we receive an flag update which contains a
-        // \RECENT flag
-        // See IMAP-287
-        List<UpdatedFlags> uflags = updated.getUpdatedFlags();
-        for (UpdatedFlags u : uflags) {
-            if (u.modifiedSystemFlags().contains(Flag.RECENT)) {
-                recentUids.add(u.getUid());
-            }
-        }
         long stamp = applicableFlagsLock.writeLock();
         applicableFlags = updateApplicableFlags(applicableFlags, updated);
         applicableFlagsLock.unlock(stamp);

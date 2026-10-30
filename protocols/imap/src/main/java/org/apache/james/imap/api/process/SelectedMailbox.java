@@ -139,6 +139,12 @@ public interface SelectedMailbox {
     boolean applyAddedUids();
 
     /**
+     * Claim the messages of the mailbox no session has seen as \Recent yet, once added uids were applied: they are
+     * \Recent in this session only. A read-only session claims none.
+     */
+    Mono<Void> claimRecent();
+
+    /**
      * Was the recent uid removed ?
      * 
      * @return true if the recent uid for this mailbox was removed

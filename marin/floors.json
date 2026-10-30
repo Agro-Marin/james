@@ -56,7 +56,7 @@
     "Keyword '$LabelN' dropped, but it still had N references": 0,
     "Keyword in PERMANENTFLAGS not introduced with FLAGS": 0,
     "Keyword used without being in FLAGS": 0,
-    "Message UID=N has \\Recent flag in multiple sessions": 5,
+    "Message UID=N has \\Recent flag in multiple sessions": 0,
     "UID changed for sequence N": 0,
     "seq too high (N > N, state=APPEND)": 0,
     "seq too high (N > N, state=EXPUNGE)": 0
@@ -69,7 +69,7 @@
       },
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 667
+        "tests": 668
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -97,7 +97,7 @@
       },
       "protocols/imap": {
         "skipped": 0,
-        "tests": 2562
+        "tests": 2564
       },
       "protocols/smtp": {
         "skipped": 0,
@@ -131,7 +131,7 @@
       },
       "mailbox/postgres": {
         "skipped": 12,
-        "tests": 780
+        "tests": 781
       },
       "mpt/impl/imap-mailbox/postgres": {
         "skipped": 0,
@@ -153,7 +153,7 @@
       },
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 667
+        "tests": 668
       },
       "mailbox/scanning-search": {
         "skipped": 2,
@@ -177,7 +177,7 @@
       },
       "mailbox/memory": {
         "skipped": 12,
-        "tests": 667
+        "tests": 668
       },
       "mailbox/scanning-search": {
         "skipped": 2,

@@ -90,11 +90,11 @@ S: 2b OK NOOP completed.
 C: 2c CLOSE
 S: 2c OK CLOSE completed.
 
-# EXISTS response on STORE (recent is no longer set)
+# EXISTS response on STORE (recent is no longer set: RFC 3501 2.3.2 gives \Recent to session 2, notified first)
 SESSION: 3
 C: 3b STORE 1 +FLAGS.SILENT (\Flagged)
 S: \* 1 EXISTS
-S: \* 1 RECENT
+S: \* 0 RECENT
 S: 3b OK STORE completed.
 
 C: 3c CLOSE
@@ -104,8 +104,8 @@ S: 3c OK CLOSE completed.
 SESSION: 4
 C: 4b CREATE another
 S: \* 1 EXISTS
-S: \* 1 RECENT
-S: \* 1 FETCH \(FLAGS \(\\Flagged \\Recent\)\)
+S: \* 0 RECENT
+S: \* 1 FETCH \(FLAGS \(\\Flagged\)\)
 S: 4b OK \[MAILBOXID \(.+\)\] CREATE completed.
 
 C: 4c DELETE another

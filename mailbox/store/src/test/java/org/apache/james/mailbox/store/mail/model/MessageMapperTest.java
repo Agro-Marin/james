@@ -402,6 +402,24 @@ public abstract class MessageMapperTest {
     }
 
     @Test
+    void concurrentResetRecentsShouldClaimEachRecentMessageOnce() throws Exception {
+        List<MessageUid> claimed = new CopyOnWriteArrayList<>();
+        ConcurrentTestRunner.builder()
+            .operation((threadNumber, step) -> {
+                MailboxMessage message = createMessage(benwaInboxMailbox, mapperProvider.generateMessageId(),
+                    "Subject: recent " + threadNumber + "-" + step + "\r\n\r\nBody\n", BODY_START);
+                message.setFlags(new Flags(Flag.RECENT));
+                messageMapper.add(benwaInboxMailbox, message);
+                messageMapper.resetRecent(benwaInboxMailbox).forEach(updated -> claimed.add(updated.getUid()));
+            })
+            .threadCount(8)
+            .operationCount(25)
+            .runSuccessfullyWithin(Duration.ofMinutes(1));
+
+        assertThat(claimed).hasSize(200).doesNotHaveDuplicates();
+    }
+
+    @Test
     void deleteShouldUpdateRecentWhenNeeded() throws MailboxException {
         saveMessages();
         FlagsUpdateCalculator setRecent = new FlagsUpdateCalculator(new Flags(Flag.RECENT), FlagsUpdateMode.REPLACE);

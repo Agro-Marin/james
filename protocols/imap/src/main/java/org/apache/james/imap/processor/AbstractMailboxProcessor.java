@@ -98,7 +98,7 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
 
             return Mono.from(metricFactory.decoratePublisherWithTimerMetric(IMAP_PREFIX + acceptableMessage.getCommand().getName(),
                 mailboxManager.manageProcessing(
-                    Mono.fromRunnable(() -> announceAddedUids(acceptableMessage, session, responder))
+                    Mono.defer(() -> announceAddedUids(acceptableMessage, session, responder))
                         .then(Mono.defer(() -> processRequestReactive(acceptableMessage, session, responder)))
                         .onErrorResume(DeniedAccessOnSharedMailboxException.class, e -> {
                             no(acceptableMessage, responder, HumanReadableText.DENIED_SHARED_MAILBOX);
@@ -125,12 +125,16 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
 
     // A selected-state command resolves its sequence numbers against what this session knows; messages added
     // since its last EXISTS are announced first, so it can name them and no response names them before EXISTS.
-    private void announceAddedUids(R request, ImapSession session, Responder responder) {
+    private Mono<Void> announceAddedUids(R request, ImapSession session, Responder responder) {
         SelectedMailbox selected = session.getSelected();
-        if (selected != null && !request.getCommand().validForState(ImapSessionState.AUTHENTICATED) && selected.applyAddedUids()) {
-            addExistsResponses(selected, responder);
-            addRecentResponses(selected, responder);
+        if (selected == null || request.getCommand().validForState(ImapSessionState.AUTHENTICATED) || !selected.applyAddedUids()) {
+            return Mono.empty();
         }
+        return selected.claimRecent()
+            .then(Mono.fromRunnable(() -> {
+                addExistsResponses(selected, responder);
+                addRecentResponses(selected, responder);
+            }));
     }
 
     protected void flags(Responder responder, SelectedMailbox selected) {
@@ -168,32 +172,33 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
     }
 
     private Mono<Void> unsolicitedResponses(ImapSession session, ImapProcessor.Responder responder, SelectedMailbox selected, boolean omitExpunged, boolean useUid) {
-        return Mono.fromRunnable(() -> {
-            boolean sizeChanged = selected.applyAddedUids();
-            // New message response
-            if (sizeChanged) {
-                addExistsResponses(selected, responder);
-            }
-            // Expunged messages
-            if (!omitExpunged) {
-                final Collection<MessageUid> expungedUids = selected.expungedUids();
-                if (!expungedUids.isEmpty()) {
-                    // Check if QRESYNC was enabled. If so we MUST use VANISHED responses
-                    if (EnableProcessor.getEnabledCapabilities(session).contains(ImapConstants.SUPPORTS_QRESYNC)) {
-                        addVanishedResponse(selected, expungedUids, responder);
-                    } else {
-                        addExpungedResponses(selected, expungedUids, responder);
-                    }
-                    // Only reset the events if we send the EXPUNGE or VANISHED responses. See IMAP-286
-                    selected.resetExpungedUids(expungedUids);
+        return Mono.fromCallable(selected::applyAddedUids)
+            .flatMap(sizeChanged -> sizeChanged ? selected.claimRecent().thenReturn(true) : Mono.just(false))
+            .doOnNext(sizeChanged -> {
+                // New message response
+                if (sizeChanged) {
+                    addExistsResponses(selected, responder);
                 }
+                // Expunged messages
+                if (!omitExpunged) {
+                    final Collection<MessageUid> expungedUids = selected.expungedUids();
+                    if (!expungedUids.isEmpty()) {
+                        // Check if QRESYNC was enabled. If so we MUST use VANISHED responses
+                        if (EnableProcessor.getEnabledCapabilities(session).contains(ImapConstants.SUPPORTS_QRESYNC)) {
+                            addVanishedResponse(selected, expungedUids, responder);
+                        } else {
+                            addExpungedResponses(selected, expungedUids, responder);
+                        }
+                        // Only reset the events if we send the EXPUNGE or VANISHED responses. See IMAP-286
+                        selected.resetExpungedUids(expungedUids);
+                    }
 
-            }
-            if (sizeChanged || (selected.isRecentUidRemoved() && !omitExpunged)) {
-                addRecentResponses(selected, responder);
-                selected.resetRecentUidRemoved();
-            }
-        })
+                }
+                if (sizeChanged || (selected.isRecentUidRemoved() && !omitExpunged)) {
+                    addRecentResponses(selected, responder);
+                    selected.resetRecentUidRemoved();
+                }
+            })
             .then(addFlagsResponses(session, selected, responder, useUid))
             .then(Mono.fromRunnable(selected::resetEvents));
     }

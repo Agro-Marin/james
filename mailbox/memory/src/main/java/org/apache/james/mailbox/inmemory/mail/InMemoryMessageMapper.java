@@ -42,6 +42,7 @@ import org.apache.james.mailbox.model.Mailbox;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageMetaData;
 import org.apache.james.mailbox.model.MessageRange;
+import org.apache.james.mailbox.model.UpdatedFlags;
 import org.apache.james.mailbox.store.mail.AbstractMessageMapper;
 import org.apache.james.mailbox.store.mail.ModSeqProvider;
 import org.apache.james.mailbox.store.mail.UidProvider;
@@ -86,6 +87,14 @@ public class InMemoryMessageMapper extends AbstractMessageMapper {
     public MessageMetaData copy(Mailbox mailbox, MailboxMessage original) throws MailboxException {
         synchronized (getMembershipByUidForMailbox(mailbox)) {
             return super.copy(mailbox, original);
+        }
+    }
+
+    // Finding and clearing the recent messages under the mailbox's lock: two resets at once must not both claim one.
+    @Override
+    public List<UpdatedFlags> resetRecent(Mailbox mailbox) throws MailboxException {
+        synchronized (getMembershipByUidForMailbox(mailbox)) {
+            return super.resetRecent(mailbox);
         }
     }
 

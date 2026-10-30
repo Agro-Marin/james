@@ -190,7 +190,10 @@ public interface MessageMapper extends Mapper {
         // Convert to MessageRanges so we may be able to optimize the flag update
         List<MessageRange> ranges = MessageRange.toRanges(members);
         for (MessageRange range : ranges) {
-            result.addAll(updateFlags(mailbox, calculator, range));
+            // A concurrent reset may have cleared a message first: only the reset that cleared it claims it.
+            Iterators.toStream(updateFlags(mailbox, calculator, range))
+                .filter(updated -> updated.getOldFlags().contains(RECENT))
+                .forEach(result::add);
         }
         return result.build();
     }
