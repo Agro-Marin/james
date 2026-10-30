@@ -1,7 +1,7 @@
 {
   "imaptest_scripted": {
     "base": [
-      2,
+      1,
       460
     ],
     "extensions": [
@@ -10,12 +10,11 @@
     ],
     "failing": [
       "fetch-body-message-rfc822-mime command 7/14",
-      "fetch-envelope command 1/2",
       "move command 12/13"
     ],
     "groups": [
       74,
-      3,
+      2,
       37
     ]
   },
@@ -64,7 +63,7 @@
       },
       "protocols/imap": {
         "skipped": 0,
-        "tests": 2565
+        "tests": 2569
       },
       "protocols/smtp": {
         "skipped": 0,

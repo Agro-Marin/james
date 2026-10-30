@@ -22,9 +22,13 @@
  */
 package org.apache.james.imap.processor.fetch;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
+import java.util.Optional;
 
 import jakarta.mail.internet.MimeUtility;
 
@@ -33,19 +37,27 @@ import org.apache.james.imap.message.response.FetchResponse;
 import org.apache.james.mailbox.exception.MailboxException;
 import org.apache.james.mailbox.model.Header;
 import org.apache.james.mailbox.model.Headers;
+import org.apache.james.mime4j.codec.DecodeMonitor;
+import org.apache.james.mime4j.codec.DecoderUtil;
 import org.apache.james.mime4j.codec.EncoderUtil;
 import org.apache.james.mime4j.dom.address.Address;
-import org.apache.james.mime4j.dom.address.AddressList;
 import org.apache.james.mime4j.dom.address.DomainList;
 import org.apache.james.mime4j.dom.address.Group;
 import org.apache.james.mime4j.dom.address.Mailbox;
-import org.apache.james.mime4j.dom.address.MailboxList;
 import org.apache.james.mime4j.field.address.LenientAddressParser;
+import org.apache.james.mime4j.stream.ParserCursor;
+import org.apache.james.mime4j.stream.RawFieldParser;
+import org.apache.james.mime4j.util.ByteSequence;
+import org.apache.james.mime4j.util.CharsetUtil;
+import org.apache.james.mime4j.util.ContentUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class EnvelopeBuilder {
     private static final Logger LOGGER = LoggerFactory.getLogger(EnvelopeBuilder.class);
+    private static final BitSet COMMA = RawFieldParser.INIT_BITSET(',');
+    private static final BitSet COLON = RawFieldParser.INIT_BITSET(':');
+    private static final BitSet COMMA_OR_SEMICOLON = RawFieldParser.INIT_BITSET(',', ';');
 
     public FetchResponse.Envelope buildEnvelope(Headers headers) throws MailboxException {
         final String date = headerValue(headers, ImapConstants.RFC822_DATE);
@@ -111,29 +123,29 @@ public final class EnvelopeBuilder {
         if ("".equals(value.trim())) {
             return null;
         }
-        AddressList addressList = LenientAddressParser.DEFAULT.parseAddressList(value);
-        final int size = addressList.size();
-        final List<FetchResponse.Envelope.Address> addresses = new ArrayList<>(size);
-        for (Address address : addressList) {
-            if (address instanceof Group) {
-                final Group group = (Group) address;
-                addAddresses(group, addresses);
-
-            } else if (address instanceof Mailbox) {
-                final Mailbox mailbox = (Mailbox) address;
-                final FetchResponse.Envelope.Address mailboxAddress = buildMailboxAddress(mailbox);
-                addresses.add(mailboxAddress);
-
-            } else {
+        ByteSequence raw = ContentUtil.encode(value);
+        ParserCursor cursor = new ParserCursor(0, raw.length());
+        final List<FetchResponse.Envelope.Address> addresses = new ArrayList<>();
+        while (!cursor.atEnd()) {
+            int start = cursor.getPos();
+            if (raw.byteAt(start) == ',') {
+                cursor.updatePos(start + 1);
+                continue;
+            }
+            Address address = LenientAddressParser.DEFAULT.parseAddress(raw, cursor, COMMA);
+            if (address instanceof Group group) {
+                addAddresses(group, raw, new ParserCursor(start, cursor.getPos()), addresses);
+            } else if (address instanceof Mailbox mailbox) {
+                addresses.add(buildMailboxAddress(mailbox, raw, start, cursor.getPos()));
+            } else if (address != null) {
                 LOGGER.warn("Unknown address type {}", address.getClass());
             }
         }
         return addresses.toArray(FetchResponse.Envelope.Address[]::new);
-
     }
 
-    private FetchResponse.Envelope.Address buildMailboxAddress(org.apache.james.mime4j.dom.address.Mailbox mailbox) {
-        final String name = encodedMailboxName(mailbox);
+    private FetchResponse.Envelope.Address buildMailboxAddress(Mailbox mailbox, ByteSequence raw, int start, int end) {
+        final String name = encodedMailboxName(mailbox, raw, start, end);
         final String domain = mailbox.getDomain();
         final DomainList route = mailbox.getRoute();
         final String atDomainList;
@@ -146,27 +158,89 @@ public final class EnvelopeBuilder {
         return buildMailboxAddress(name, atDomainList, localPart, domain);
     }
 
-    private String encodedMailboxName(Mailbox mailbox) {
+    private String encodedMailboxName(Mailbox mailbox, ByteSequence raw, int start, int end) {
         // Encode the mailbox name
         // See IMAP-266
-        String name = mailbox.getName();
-        if (name != null) {
-            return EncoderUtil.encodeAddressDisplayName(name);
-        }
-        return null;
+        return Optional.ofNullable(mailbox.getName())
+            .or(() -> addrSpecComment(raw, start, end).map(comment -> DecoderUtil.decodeEncodedWords(comment, DecodeMonitor.SILENT)))
+            .map(EncoderUtil::encodeAddressDisplayName)
+            .orElse(null);
     }
 
-    private void addAddresses(Group group, List<FetchResponse.Envelope.Address> addresses) {
-        final String groupName = group.getName();
-        final FetchResponse.Envelope.Address start = startGroup(groupName);
-        addresses.add(start);
-        final MailboxList mailboxList = group.getMailboxes();
-        for (Mailbox mailbox : mailboxList) {
-            final FetchResponse.Envelope.Address address = buildMailboxAddress(mailbox);
-            addresses.add(address);
+    // An old-style "user@domain (Real Name)" names its mailbox in the comment, which mime4j skips: as in Dovecot,
+    // the last comment of a bare addr-spec is its name, and a name-addr's comments are not.
+    private static Optional<String> addrSpecComment(ByteSequence raw, int start, int end) {
+        Optional<String> comment = Optional.empty();
+        boolean inAddrSpec = false;
+        int pos = start;
+        while (pos < end) {
+            char current = (char) (raw.byteAt(pos) & 0xff);
+            if (current == '(') {
+                ByteArrayOutputStream text = new ByteArrayOutputStream();
+                pos = readComment(raw, pos + 1, end, text);
+                if (inAddrSpec) {
+                    comment = Optional.of(text.toString(StandardCharsets.UTF_8)).filter(name -> !name.isEmpty());
+                }
+            } else if (current == '<') {
+                return Optional.empty();
+            } else if (current == '"' || current == '[') {
+                inAddrSpec = true;
+                pos = skipQuoted(raw, pos + 1, end, current == '"' ? '"' : ']');
+            } else {
+                inAddrSpec |= !CharsetUtil.isWhitespace(current);
+                pos++;
+            }
         }
-        final FetchResponse.Envelope.Address end = endGroup();
-        addresses.add(end);
+        return comment;
+    }
+
+    private static int readComment(ByteSequence raw, int pos, int end, ByteArrayOutputStream text) {
+        int level = 1;
+        while (pos < end) {
+            byte current = raw.byteAt(pos);
+            if (current == '\\' && pos + 1 < end) {
+                pos++;
+                current = raw.byteAt(pos);
+            } else if (current == '(') {
+                level++;
+            } else if (current == ')' && --level == 0) {
+                return pos + 1;
+            }
+            text.write(current);
+            pos++;
+        }
+        return pos;
+    }
+
+    private static int skipQuoted(ByteSequence raw, int pos, int end, char closing) {
+        while (pos < end) {
+            byte current = raw.byteAt(pos);
+            if (current == '\\') {
+                pos++;
+            } else if (current == closing) {
+                return pos + 1;
+            }
+            pos++;
+        }
+        return pos;
+    }
+
+    private void addAddresses(Group group, ByteSequence raw, ParserCursor cursor, List<FetchResponse.Envelope.Address> addresses) {
+        addresses.add(startGroup(group.getName()));
+        RawFieldParser.DEFAULT.parseValue(raw, cursor, COLON);
+        cursor.updatePos(cursor.getPos() + 1);
+        while (!cursor.atEnd() && raw.byteAt(cursor.getPos()) != ';') {
+            int start = cursor.getPos();
+            if (raw.byteAt(start) == ',') {
+                cursor.updatePos(start + 1);
+                continue;
+            }
+            Mailbox mailbox = LenientAddressParser.DEFAULT.parseMailbox(raw, cursor, COMMA_OR_SEMICOLON);
+            if (mailbox != null) {
+                addresses.add(buildMailboxAddress(mailbox, raw, start, cursor.getPos()));
+            }
+        }
+        addresses.add(endGroup());
     }
 
     private FetchResponse.Envelope.Address startGroup(String groupName) {

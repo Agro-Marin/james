@@ -82,3 +82,26 @@ S: \* 6 FETCH \(ENVELOPE \("Mon, 10 Feb 1994 21:52:25 -0800 \(PST\)" "Re: Test 0
 S: f3 OK FETCH completed.
 
 TIMER print fetch
+
+C: A009 APPEND selected {516+}
+C: Date: Mon, 10 Feb 1994 21:52:25 -0800 (PST)
+C: From: mooch@owatagu.siam.edu (Mooch Cat)
+C: Sender: (Lead) boss@owatagu.siam.edu (Boss) (Big Boss)
+C: Reply-to: Bin <dev.null@owatagu.siam.edu> (Not A Name), air@owatagu.siam.edu ()
+C: Subject: Re: Test 07
+C: To: group: john.doe@acme.org (John Doe), mary@example.net;
+C: Cc: moo@example.COM (=?ISO-8859-1?Q?Mo=F6?=)
+C: Bcc: <spy@owatagu.siam.ed> (Not A Name)
+C: Message-Id: <12345677890-mooch@owatagu.siam.edu>
+C: MIME-Version: 1.0
+C: Content-Type: TEXT/PLAIN; CHARSET=US-ASCII
+C:
+C: Works!
+C:
+S: \* 7 EXISTS
+S: \* 7 RECENT
+S: A009 OK (\[.+\] )?APPEND completed.
+
+C: f4 FETCH 7 (ENVELOPE)
+S: \* 7 FETCH \(ENVELOPE \("Mon, 10 Feb 1994 21:52:25 -0800 \(PST\)" "Re: Test 07" \(\("Mooch Cat" NIL "mooch" "owatagu.siam.edu"\)\) \(\("Big Boss" NIL "boss" "owatagu.siam.edu"\)\) \(\("Bin" NIL "dev.null" "owatagu.siam.edu"\)\(NIL NIL "air" "owatagu.siam.edu"\)\) \(\(NIL NIL "group" NIL\)\("John Doe" NIL "john.doe" "acme.org"\)\(NIL NIL "mary" "example.net"\)\(NIL NIL NIL NIL\)\) \(\("=\?ISO-8859-1\?B\?TW/2\?=" NIL "moo" "example.COM"\)\) \(\(NIL NIL "spy" "owatagu.siam.ed"\)\) NIL "<12345677890-mooch@owatagu.siam.edu>"\)\)
+S: f4 OK FETCH completed.
