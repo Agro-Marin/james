@@ -25,8 +25,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.james.mailbox.exception.MailboxException;
+import org.apache.james.mailbox.model.ByteContent;
 import org.apache.james.mailbox.model.Content;
 import org.apache.james.mailbox.model.FetchGroup;
 import org.apache.james.mailbox.model.Header;
@@ -34,7 +36,8 @@ import org.apache.james.mailbox.model.MessageResult;
 import org.apache.james.mailbox.model.MimePath;
 import org.apache.james.mailbox.model.PartContentDescriptor;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
-import org.apache.james.mailbox.store.streaming.PartContentBuilder;
+import org.apache.james.mailbox.store.streaming.FullByteContent;
+import org.apache.james.mailbox.store.streaming.MimePart;
 import org.apache.james.mime4j.MimeException;
 import org.apache.james.mime4j.parser.AbstractContentHandler;
 import org.apache.james.mime4j.parser.MimeStreamParser;
@@ -214,45 +217,11 @@ public class ResultUtils {
         }
     }
 
-    private static PartContentBuilder build(int[] path, MailboxMessage message)
-            throws IOException, MimeException {
-        InputStream stream = message.getFullContent();
-        PartContentBuilder result = new PartContentBuilder();
-        result.parse(stream);
-        try {
-            for (int next : path) {
-                result.to(next);
-            }
-        } catch (PartContentBuilder.PartNotFoundException e) {
-            // Missing parts should return zero sized content
-            // See http://markmail.org/message/2jconrj7scvdi5dj
-            result.markEmpty();
+    private static Optional<MimePart> locate(int[] path, MailboxMessage message) throws IOException, MimeException {
+        try (InputStream stream = message.getFullContent()) {
+            // A missing part has empty content, see http://markmail.org/message/2jconrj7scvdi5dj
+            return MimePart.message(stream.readAllBytes()).locate(path);
         }
-        return result;
-    }
-
-    private static boolean isNonMultipart(MailboxMessage message) throws IOException {
-        return createHeaders(message).stream()
-            .filter(h -> h.getName().equalsIgnoreCase("Content-Type"))
-            .map(Header::getValue)
-            .findFirst()
-            .map(ct -> !ct.toLowerCase().trim().startsWith("multipart"))
-            .orElse(true);
-    }
-
-    private static PartContentBuilder buildHandleSinglePart(int[] path, MailboxMessage message) throws IOException, MimeException {
-        // CF RFC-3501 section 6.4.5
-        //
-        // Every message has at least one part number.  Non-[MIME-IMB]
-        // messages, and non-multipart [MIME-IMB] messages with no
-        // encapsulated message, only have a part 1.
-        if (path.length == 1 && path[0] == 1 && isNonMultipart(message)) {
-            InputStream stream = message.getFullContent();
-            PartContentBuilder result = new PartContentBuilder();
-            result.parse(stream);
-            return result;
-        }
-        return build(path, message);
     }
 
     private static int[] path(MimePath mimePath) {
@@ -267,8 +236,8 @@ public class ResultUtils {
             throws IOException, MimeException {
         int[] path = path(mimePath);
         if (path != null) {
-            PartContentBuilder builder = build(path, message);
-            List<Header> headers = builder.getMessageHeaders();
+            Optional<MimePart> part = locate(path, message);
+            List<Header> headers = part.isPresent() ? part.get().messageHeaders() : List.of();
             messageResult.setHeaders(mimePath, headers.iterator());
         }
     }
@@ -277,8 +246,7 @@ public class ResultUtils {
             throws IOException, MimeException {
         int[] path = path(mimePath);
         if (path != null) {
-            PartContentBuilder builder = buildHandleSinglePart(path, message);
-            List<Header> headers = builder.getMimeHeaders();
+            List<Header> headers = locate(path, message).map(MimePart::mimeHeaders).orElse(List.of());
             messageResult.setMimeHeaders(mimePath, headers.iterator());
         }
     }
@@ -287,9 +255,9 @@ public class ResultUtils {
             throws IOException, MimeException {
         int[] path = path(mimePath);
         if (path != null) {
-            PartContentBuilder builder = build(path, message);
-            Content content = builder.getMessageBodyContent();
-            messageResult.setBodyContent(mimePath, content);
+            Optional<MimePart> part = locate(path, message);
+            byte[] content = part.isPresent() ? part.get().messageBody() : new byte[0];
+            messageResult.setBodyContent(mimePath, new ByteContent(content));
         }
     }
 
@@ -297,18 +265,17 @@ public class ResultUtils {
             throws IOException, MimeException {
         int[] path = path(mimePath);
         if (path != null) {
-            PartContentBuilder builder = build(path, message);
-            Content content = builder.getMimeBodyContent();
-            messageResult.setMimeBodyContent(mimePath, content);
+            byte[] content = locate(path, message).map(MimePart::body).orElse(new byte[0]);
+            messageResult.setMimeBodyContent(mimePath, new ByteContent(content));
         }
     }
 
     private static void addFullContent(MailboxMessage message, MessageResultImpl messageResult, MimePath mimePath)
-            throws MailboxException, IOException, MimeException {
+            throws IOException, MimeException {
         int[] path = path(mimePath);
         if (path != null) {
-            PartContentBuilder builder = build(path, message);
-            Content content = builder.getFullContent();
+            Optional<MimePart> part = locate(path, message);
+            Content content = new FullByteContent(part.map(MimePart::body).orElse(new byte[0]), part.map(MimePart::mimeHeaders).orElse(List.of()));
             messageResult.setFullContent(mimePath, content);
         }
     }

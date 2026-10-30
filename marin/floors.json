@@ -1,7 +1,7 @@
 {
   "imaptest_scripted": {
     "base": [
-      31,
+      8,
       459
     ],
     "extensions": [
@@ -11,30 +11,7 @@
     "failing": [
       "atoms command 3/5",
       "atoms command 4/5",
-      "fetch-body-message-rfc822 command 3/9",
-      "fetch-body-message-rfc822 command 4/9",
-      "fetch-body-message-rfc822 command 5/9",
-      "fetch-body-message-rfc822 command 6/9",
-      "fetch-body-message-rfc822 command 7/9",
-      "fetch-body-message-rfc822 command 8/9",
-      "fetch-body-message-rfc822-mime command 10/14",
-      "fetch-body-message-rfc822-mime command 11/14",
-      "fetch-body-message-rfc822-mime command 12/14",
-      "fetch-body-message-rfc822-mime command 13/14",
-      "fetch-body-message-rfc822-mime command 3/14",
-      "fetch-body-message-rfc822-mime command 4/14",
-      "fetch-body-message-rfc822-mime command 5/14",
-      "fetch-body-message-rfc822-mime command 6/14",
       "fetch-body-message-rfc822-mime command 7/14",
-      "fetch-body-message-rfc822-mime command 8/14",
-      "fetch-body-message-rfc822-mime command 9/14",
-      "fetch-body-message-rfc822-x2 command 3/10",
-      "fetch-body-message-rfc822-x2 command 4/10",
-      "fetch-body-message-rfc822-x2 command 5/10",
-      "fetch-body-message-rfc822-x2 command 6/10",
-      "fetch-body-message-rfc822-x2 command 7/10",
-      "fetch-body-message-rfc822-x2 command 8/10",
-      "fetch-body-message-rfc822-x2 command 9/10",
       "fetch-envelope command 1/2",
       "listext command 20/34",
       "listext command 21/34",
@@ -48,7 +25,7 @@
     ],
     "groups": [
       74,
-      9,
+      7,
       37
     ]
   },
@@ -77,7 +54,7 @@
       },
       "mailbox/store": {
         "skipped": 0,
-        "tests": 473
+        "tests": 480
       },
       "mailet/base": {
         "skipped": 0,
@@ -161,7 +138,7 @@
       },
       "mailbox/store": {
         "skipped": 0,
-        "tests": 473
+        "tests": 480
       }
     },
     "tz-America_Mexico_City-jmap": {
@@ -185,7 +162,7 @@
       },
       "mailbox/store": {
         "skipped": 0,
-        "tests": 473
+        "tests": 480
       }
     },
     "tz-America_Monterrey-jmap": {

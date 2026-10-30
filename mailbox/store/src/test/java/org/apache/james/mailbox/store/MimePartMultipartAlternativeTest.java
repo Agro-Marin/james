@@ -21,18 +21,16 @@ package org.apache.james.mailbox.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.james.mailbox.model.Header;
-import org.apache.james.mailbox.store.streaming.PartContentBuilder;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.james.mailbox.store.streaming.FullByteContent;
+import org.apache.james.mailbox.store.streaming.MimePart;
 import org.junit.jupiter.api.Test;
 
-class PartContentBuilderMultipartAlternativeTest {
+class MimePartMultipartAlternativeTest {
 
     static final String CONTENT_TYPE_PLAIN = "text/plain;charset=us-ascii";
 
@@ -70,12 +68,6 @@ class PartContentBuilderMultipartAlternativeTest {
             + ALT_PART_HTML
             + "\r\n--4242\r\n" + ALT_PART_XHTML + "\r\n--4242\r\n";
 
-    PartContentBuilder builder;
-
-    @BeforeEach
-    void setUp() {
-        builder = new PartContentBuilder();
-    }
 
     @Test
     void testShouldLocatePartsOfMultipartAlterative() throws Exception {
@@ -100,19 +92,12 @@ class PartContentBuilderMultipartAlternativeTest {
     }
 
     private String fullContent(String mail, int position) throws Exception {
-        InputStream in = new ByteArrayInputStream(StandardCharsets.US_ASCII
-                .encode(mail).array());
-        builder.parse(in);
-        builder.to(position);
-        return IOUtils.toString(builder.getFullContent().getInputStream(), StandardCharsets.UTF_8);
+        MimePart part = locate(mail, position);
+        return IOUtils.toString(new FullByteContent(part.body(), part.mimeHeaders()).getInputStream(), StandardCharsets.UTF_8);
     }
 
     private String bodyContent(String mail, int position) throws Exception {
-        InputStream in = new ByteArrayInputStream(StandardCharsets.US_ASCII
-                .encode(mail).array());
-        builder.parse(in);
-        builder.to(position);
-        return IOUtils.toString(builder.getMimeBodyContent().getInputStream(), StandardCharsets.UTF_8);
+        return new String(locate(mail, position).body(), StandardCharsets.UTF_8);
     }
 
     private void checkContentType(String contentType, String mail, int position)
@@ -125,10 +110,10 @@ class PartContentBuilderMultipartAlternativeTest {
     }
 
     private List<Header> headers(String mail, int position) throws Exception {
-        InputStream in = new ByteArrayInputStream(StandardCharsets.US_ASCII
-                .encode(mail).array());
-        builder.parse(in);
-        builder.to(position);
-        return builder.getMimeHeaders();
+        return locate(mail, position).mimeHeaders();
+    }
+
+    private MimePart locate(String mail, int position) throws Exception {
+        return MimePart.message(mail.getBytes(StandardCharsets.US_ASCII)).locate(new int[] {position}).orElseThrow();
     }
 }

@@ -20,21 +20,18 @@
 package org.apache.james.mailbox.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Fail.fail;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.james.mailbox.model.Header;
-import org.apache.james.mailbox.store.streaming.PartContentBuilder;
-import org.apache.james.mailbox.store.streaming.PartContentBuilder.PartNotFoundException;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.james.mailbox.store.streaming.FullByteContent;
+import org.apache.james.mailbox.store.streaming.MimePart;
 import org.junit.jupiter.api.Test;
 
-class PartContentBuilderComplexMultipartTest {
+class MimePartComplexMultipartTest {
 
     static final String PREAMBLE = "This is the preamble";
 
@@ -110,12 +107,6 @@ class PartContentBuilderComplexMultipartTest {
             + FULL_OUTER_PLAIN
             + "\r\n--4242--\r\n";
 
-    PartContentBuilder builder;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        builder = new PartContentBuilder();
-    }
 
     @Test
     void testShouldNotFoundSubPartOfNonMultiPartTopLevel()
@@ -174,12 +165,7 @@ class PartContentBuilderComplexMultipartTest {
     }
 
     private void checkNotPartFound(int[] position) throws Exception {
-        try {
-            to(position);
-            fail("Part does not exist. Expected exception to be thrown.");
-        } catch (PartNotFoundException e) {
-            // expected
-        }
+        assertThat(locate(position)).isEmpty();
     }
 
     private void check(String full, String body, String contentType,
@@ -190,13 +176,12 @@ class PartContentBuilderComplexMultipartTest {
     }
 
     private String fullContent(int[] position) throws Exception {
-        to(position);
-        return IOUtils.toString(builder.getFullContent().getInputStream(), StandardCharsets.UTF_8);
+        MimePart part = locate(position).orElseThrow();
+        return IOUtils.toString(new FullByteContent(part.body(), part.mimeHeaders()).getInputStream(), StandardCharsets.UTF_8);
     }
 
     private String bodyContent(int[] position) throws Exception {
-        to(position);
-        return IOUtils.toString(builder.getMimeBodyContent().getInputStream(), StandardCharsets.UTF_8);
+        return new String(locate(position).orElseThrow().body(), StandardCharsets.UTF_8);
     }
 
     private void checkContentType(String contentType, int[] position)
@@ -209,16 +194,10 @@ class PartContentBuilderComplexMultipartTest {
     }
 
     private List<Header> headers(int[] position) throws Exception {
-        to(position);
-        return builder.getMimeHeaders();
+        return locate(position).orElseThrow().mimeHeaders();
     }
 
-    private void to(int[] path) throws Exception {
-        InputStream in = new ByteArrayInputStream(StandardCharsets.US_ASCII
-                .encode(MULTIPART_MIXED).array());
-        builder.parse(in);
-        for (int aPath : path) {
-            builder.to(aPath);
-        }
+    private Optional<MimePart> locate(int[] path) throws Exception {
+        return MimePart.message(MULTIPART_MIXED.getBytes(StandardCharsets.US_ASCII)).locate(path);
     }
 }
