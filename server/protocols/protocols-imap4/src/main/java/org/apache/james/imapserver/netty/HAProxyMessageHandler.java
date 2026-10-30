@@ -22,6 +22,8 @@ package org.apache.james.imapserver.netty;
 import static org.apache.james.imap.api.process.ImapSession.MDC_KEY;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.james.imap.api.ConnectionCheck;
@@ -40,6 +42,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.haproxy.HAProxyMessage;
 import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
 import io.netty.util.AttributeKey;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -49,6 +52,9 @@ public class HAProxyMessageHandler extends ChannelInboundHandlerAdapter {
     public static final AttributeKey<ProxyInformation> PROXY_INFO = AttributeKey.valueOf("proxyInfo");
 
     private final Set<ConnectionCheck> connectionChecks;
+    // What the client sent after its PROXY header, held until the connection check ends; event loop only.
+    private final List<Object> heldMessages = new ArrayList<>();
+    private boolean checkingConnection;
 
     public HAProxyMessageHandler(Set<ConnectionCheck> connectionChecks) {
         this.connectionChecks = connectionChecks;
@@ -58,9 +64,31 @@ public class HAProxyMessageHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (msg instanceof HAProxyMessage) {
             handleHAProxyMessage(ctx, (HAProxyMessage) msg);
+        } else if (checkingConnection) {
+            heldMessages.add(msg);
         } else {
             super.channelRead(ctx, msg);
         }
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        releaseHeldMessages();
+        super.channelInactive(ctx);
+    }
+
+    private void replayHeldMessages(ChannelHandlerContext ctx) throws Exception {
+        checkingConnection = false;
+        List<Object> held = new ArrayList<>(heldMessages);
+        heldMessages.clear();
+        held.forEach(ctx::fireChannelRead);
+        ctx.channel().config().setAutoRead(true);
+        super.channelReadComplete(ctx);
+    }
+
+    private void releaseHeldMessages() {
+        heldMessages.forEach(ReferenceCountUtil::release);
+        heldMessages.clear();
     }
 
     private void handleHAProxyMessage(ChannelHandlerContext ctx, HAProxyMessage haproxyMsg) {
@@ -79,8 +107,10 @@ public class HAProxyMessageHandler extends ChannelInboundHandlerAdapter {
             MDCBuilder boundMDC = IMAPMDCContext.boundMDC(ctx);
 
             // Pause reading while the connection check is in progress to prevent IMAP
-            // commands from being processed before the check completes.
+            // commands from being processed before the check completes. Bytes read along with the PROXY header are
+            // already in the pipeline: they are held, or a banned client's LOGIN would run before its ban.
             ctx.channel().config().setAutoRead(false);
+            checkingConnection = true;
             performConnectionCheck(sourceIP)
                 .then(Mono.fromRunnable(() -> {
                     if (imapSession != null) {
@@ -89,11 +119,11 @@ public class HAProxyMessageHandler extends ChannelInboundHandlerAdapter {
                 }))
                 .doFinally(any -> haproxyMsg.release())
                 .subscribe(any -> {
-                }, error -> ctx.executor().execute(() -> ctx.pipeline().fireExceptionCaught(error)),
-                    () -> ctx.executor().execute(Throwing.runnable(() -> {
-                        ctx.channel().config().setAutoRead(true);
-                        super.channelReadComplete(ctx);
-                    })));
+                }, error -> ctx.executor().execute(() -> {
+                    // Still checking: whatever else arrives is held too, and released with the channel.
+                    releaseHeldMessages();
+                    ctx.pipeline().fireExceptionCaught(error);
+                }), () -> ctx.executor().execute(Throwing.runnable(() -> replayHeldMessages(ctx))));
 
         } else {
             haproxyMsg.release();

@@ -41,7 +41,7 @@ public class ImapHeartbeatHandler extends IdleStateHandler {
     @Override
     public void channelIdle(ChannelHandlerContext ctx, IdleStateEvent e) throws Exception {
         if (e.state().equals(IdleState.WRITER_IDLE)) {
-            ctx.channel().writeAndFlush(HEARTBEAT_BUFFER.get());
+            ChannelImapResponseWriter.writeInOrder(ctx.channel(), () -> ctx.channel().writeAndFlush(HEARTBEAT_BUFFER.get()));
         }
         super.channelIdle(ctx, e);
     }

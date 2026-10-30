@@ -117,7 +117,7 @@
       },
       "server/protocols/protocols-imap4": {
         "skipped": 1,
-        "tests": 637
+        "tests": 639
       },
       "server/protocols/protocols-smtp": {
         "skipped": 1,

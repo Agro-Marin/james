@@ -54,7 +54,6 @@ import com.google.common.annotations.VisibleForTesting;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.ByteToMessageDecoder;
@@ -184,7 +183,7 @@ public class ImapRequestFrameDecoder extends ByteToMessageDecoder implements Net
             // The session was null so may be the case because the channel was already closed but there were still bytes in the buffer.
             // We now try to disconnect the client if still connected
             if (ctx.channel().isActive()) {
-                ctx.channel().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                ChannelImapResponseWriter.closeAfterWrites(ctx.channel());
             }
         }
         return Optional.empty();

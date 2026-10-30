@@ -47,7 +47,7 @@ public abstract class AbstractNettyImapRequestLineReader extends ImapRequestLine
         // request..
 
         if (!retry) {
-            channel.writeAndFlush(CONTINUATION_REQUEST.get());
+            ChannelImapResponseWriter.writeInOrder(channel, () -> channel.writeAndFlush(CONTINUATION_REQUEST.get()));
         }
     }
 

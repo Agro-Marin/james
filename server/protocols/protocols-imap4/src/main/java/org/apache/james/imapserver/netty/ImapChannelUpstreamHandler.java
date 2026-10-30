@@ -60,9 +60,7 @@ import org.slf4j.LoggerFactory;
 
 import com.github.fge.lambdas.Throwing;
 
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -417,7 +415,7 @@ public class ImapChannelUpstreamHandler extends ChannelInboundHandlerAdapter imp
                 // Make sure we close the channel after all the buffers were flushed out
                 Channel channel = ctx.channel();
                 if (channel.isActive()) {
-                    channel.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                    ChannelImapResponseWriter.closeAfterWrites(channel);
                 }
                 super.channelInactive(ctx);
             }))
@@ -428,7 +426,7 @@ public class ImapChannelUpstreamHandler extends ChannelInboundHandlerAdapter imp
                     Optional.ofNullable(imapSession).map(u -> u.getUserName().asString()).orElse(""), e);
                 Channel channel = ctx.channel();
                 if (channel.isActive()) {
-                    channel.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                    ChannelImapResponseWriter.closeAfterWrites(channel);
                 }
             });
     }
@@ -464,7 +462,7 @@ public class ImapChannelUpstreamHandler extends ChannelInboundHandlerAdapter imp
                         // Make sure we close the channel after all the buffers were flushed out
                         Channel channel = ctx.channel();
                         if (channel.isActive()) {
-                            channel.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                            ChannelImapResponseWriter.closeAfterWrites(channel);
                         }
                     }
                     if (signal.isOnComplete()) {

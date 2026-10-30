@@ -25,7 +25,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.FileChannel;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.james.imap.api.process.ImapSession;
 import org.apache.james.imap.encode.ImapResponseWriter;
@@ -35,14 +38,18 @@ import org.apache.james.util.MDCStructuredLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableList;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.compression.ZlibEncoder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedNioFile;
 import io.netty.handler.stream.ChunkedStream;
+import io.netty.util.AttributeKey;
 
 /**
  * {@link ImapResponseWriter} implementation which writes the data to a
@@ -55,6 +62,7 @@ public class ChannelImapResponseWriter implements ImapResponseWriter {
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ChannelImapResponseWriter.class);
+    private static final AttributeKey<AtomicInteger> WRITES_QUEUED = AttributeKey.valueOf("imapWritesQueued");
     private final Channel channel;
     private final boolean zeroCopy;
     private FlushCallback flushCallback;
@@ -91,7 +99,7 @@ public class ChannelImapResponseWriter implements ImapResponseWriter {
             }
         }
         if (channel.isActive()) {
-            channel.writeAndFlush(Unpooled.wrappedBuffer(buffer));
+            writeInOrder(channel, () -> channel.writeAndFlush(Unpooled.wrappedBuffer(buffer)));
         }
     }
 
@@ -100,22 +108,23 @@ public class ChannelImapResponseWriter implements ImapResponseWriter {
         flushCallback.run();
         if (channel.isActive()) {
             // A SequencedLiteral's parts are written in one pass and flushed once, each keeping its best representation.
-            if (literal instanceof SequencedLiteral sequencedLiteral) {
-                for (Literal part : sequencedLiteral.parts()) {
-                    writePart(part);
-                }
-            } else {
-                writePart(literal);
+            List<Literal> parts = literal instanceof SequencedLiteral sequencedLiteral ? sequencedLiteral.parts() : List.of(literal);
+            ImmutableList.Builder<Object> messages = ImmutableList.builder();
+            for (Literal part : parts) {
+                messages.add(toMessage(part));
             }
-            channel.flush();
+            List<Object> built = messages.build();
+            writeInOrder(channel, () -> {
+                built.forEach(channel::write);
+                channel.flush();
+            });
         }
     }
 
-    private void writePart(Literal literal) throws IOException {
+    private Object toMessage(Literal literal) throws IOException {
         Optional<byte[][]> bytesSequence = literal.asBytesSequence();
         if (bytesSequence.isPresent()) {
-            channel.write(Unpooled.wrappedBuffer(bytesSequence.get()));
-            return;
+            return Unpooled.wrappedBuffer(bytesSequence.get());
         }
         InputStream in = literal.getInputStream();
         if (in instanceof FileInputStream) {
@@ -125,18 +134,60 @@ public class ChannelImapResponseWriter implements ImapResponseWriter {
             // See JAMES-1305 and JAMES-1306
             ChannelPipeline cp = channel.pipeline();
             if (zeroCopy && cp.get(SslHandler.class) == null && cp.get(ZlibEncoder.class) == null) {
-                channel.write(new DefaultFileRegion(fc, fc.position(), literal.size()));
-            } else {
-                channel.write(new ChunkedNioFile(fc, 8192));
+                return new DefaultFileRegion(fc, fc.position(), literal.size());
             }
-        } else {
-            channel.write(new ChunkedStream(in));
+            return new ChunkedNioFile(fc, 8192);
         }
+        return new ChunkedStream(in);
     }
-    
+
     public void flush() throws IOException {
         flushCallback.run();
-        channel.flush();
+        writeInOrder(channel, channel::flush);
+    }
+
+    // Netty runs a write made on the event loop at once but queues one made on another thread, so a tagged OK written
+    // on the event loop overtook the FETCH literal a reactor thread had queued just before. Writes queued from other
+    // threads are counted until the event loop reaches them, and an event-loop write waits behind them. Off the event
+    // loop the write stays Netty's own queued task, which counts its bytes against the channel's writability. Every
+    // write to an IMAP channel goes through here, the closes included, or it can overtake the responses.
+    public static void writeInOrder(Channel channel, Runnable write) {
+        AtomicInteger queued = writesQueued(channel);
+        if (!channel.eventLoop().inEventLoop()) {
+            queued.incrementAndGet();
+            write.run();
+            executeOrRun(channel, queued::decrementAndGet);
+        } else if (queued.get() > 0) {
+            queued.incrementAndGet();
+            executeOrRun(channel, () -> {
+                write.run();
+                queued.decrementAndGet();
+            });
+        } else {
+            write.run();
+        }
+    }
+
+    public static void closeAfterWrites(Channel channel) {
+        writeInOrder(channel, () -> channel.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE));
+    }
+
+    // A loop shutting down refuses tasks; run it here so the count goes down and Netty fails and releases the write.
+    private static void executeOrRun(Channel channel, Runnable task) {
+        try {
+            channel.eventLoop().execute(task);
+        } catch (RejectedExecutionException e) {
+            task.run();
+        }
+    }
+
+    private static AtomicInteger writesQueued(Channel channel) {
+        AtomicInteger queued = channel.attr(WRITES_QUEUED).get();
+        if (queued != null) {
+            return queued;
+        }
+        AtomicInteger created = new AtomicInteger();
+        return Optional.ofNullable(channel.attr(WRITES_QUEUED).setIfAbsent(created)).orElse(created);
     }
 
 }

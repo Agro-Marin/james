@@ -68,9 +68,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.group.DefaultChannelGroup;
@@ -174,7 +172,7 @@ public class IMAPServer extends AbstractConfigurableAsyncServer implements ImapC
                 .flatMap(session -> Optional.ofNullable(session.getUserName()))
                 .map(user::test)
                 .orElse(false))
-            .forEach(channel -> channel.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE));
+            .forEach(ChannelImapResponseWriter::closeAfterWrites);
     }
 
     private static Integer parseLiteralSizeLimit(HierarchicalConfiguration<ImmutableNode> configuration) {
