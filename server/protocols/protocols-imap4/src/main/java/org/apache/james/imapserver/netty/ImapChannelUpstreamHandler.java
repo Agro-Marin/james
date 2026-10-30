@@ -458,6 +458,10 @@ public class ImapChannelUpstreamHandler extends ChannelInboundHandlerAdapter imp
         ResponseEncoder responseEncoder = new ResponseEncoder(encoder, response);
         Disposable disposable = reactiveThrottler.throttle(processor.processReactive(message, responseEncoder, session)
                 .doOnEach(Throwing.consumer(signal -> {
+                    // The composer still holds the end of the response, the tagged one included: write it before the
+                    // next command is let in, or that command's responses overtake it, e.g. an EXPUNGE ahead of the
+                    // tagged OK of the FETCH it must follow (RFC 3501 7.4.1).
+                    response.flush();
                     if (session.getState() == ImapSessionState.LOGOUT) {
                         // Make sure we close the channel after all the buffers were flushed out
                         Channel channel = ctx.channel();
@@ -490,7 +494,6 @@ public class ImapChannelUpstreamHandler extends ChannelInboundHandlerAdapter imp
                         ctx.fireExceptionCaught(signal.getThrowable());
                     }
                     disposableAttribute.set(null);
-                    response.flush();
                     ctx.fireChannelReadComplete();
                     if (waitingMessage != null) {
                         if (signal.isOnComplete()) {
