@@ -20,6 +20,7 @@
 package org.apache.james.imap.processor;
 
 import java.util.List;
+import java.util.Optional;
 
 import jakarta.inject.Inject;
 
@@ -75,8 +76,8 @@ public class MoveProcessor extends AbstractMessageRangeProcessor<MoveRequest> im
 
     // RFC 6851 4.3: the COPYUID of a MOVE comes in an untagged OK, before the EXPUNGE responses for the moved messages
     @Override
-    protected Mono<Void> respond(MoveRequest request, StatusResponse.ResponseCode copyUid, ImapSession session, Responder responder) {
-        return Mono.fromRunnable(() -> responder.respond(getStatusResponseFactory().untaggedOk(HumanReadableText.MOVED_UIDS, copyUid)))
+    protected Mono<Void> respond(MoveRequest request, Optional<StatusResponse.ResponseCode> copyUid, ImapSession session, Responder responder) {
+        return Mono.fromRunnable(() -> copyUid.ifPresent(code -> responder.respond(getStatusResponseFactory().untaggedOk(HumanReadableText.MOVED_UIDS, code))))
             .then(Mono.defer(() -> unsolicitedResponses(session, responder, request.isUseUids())))
             .then(Mono.fromRunnable(() -> okComplete(request, responder)));
     }

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.LongStream;
 
 import org.apache.james.core.Username;
 import org.apache.james.imap.api.ImapCommand;
@@ -102,6 +103,7 @@ class CopyProcessorTest {
         SelectedMailbox selectedMailbox = mock(SelectedMailbox.class);
         when(selectedMailbox.getLastUid()).thenReturn(Optional.of(MessageUid.of(8)));
         when(selectedMailbox.existsCount()).thenReturn(8L);
+        when(selectedMailbox.allUids()).thenReturn(LongStream.rangeClosed(1, 8).mapToObj(MessageUid::of).toList());
         when(selectedMailbox.getMailboxId()).thenReturn(MAILBOX_ID);
         imapSession.selected(selectedMailbox).block();
         when(mockMailboxManager.mailboxExists(INBOX, mailboxSession)).thenReturn(Mono.just(true));
@@ -124,6 +126,31 @@ class CopyProcessorTest {
         verify(mockMailboxManager).copyMessagesReactive(eq(List.of(MessageRange.range(MessageUid.of(4), MessageUid.of(6)))), any(MailboxId.class), any(MailboxId.class), eq(mailboxSession));
         verify(targetMessageManager).getMailboxEntity();
         verify(mockResponder).respond(okResponse);
+    }
+
+    @Test
+    void copyUidShouldNameTheSourceUidsOfASequenceSet() throws Exception {
+        CopyRequest copyRequest = new CopyRequest(new IdRange[] {new IdRange(1)}, ImapConstants.INBOX_NAME, false, TAG);
+        SelectedMailbox selectedMailbox = mock(SelectedMailbox.class);
+        when(selectedMailbox.existsCount()).thenReturn(1L);
+        when(selectedMailbox.uid(1)).thenReturn(Optional.of(MessageUid.of(3)));
+        when(selectedMailbox.allUids()).thenReturn(List.of(MessageUid.of(3)));
+        when(selectedMailbox.getMailboxId()).thenReturn(MAILBOX_ID);
+        imapSession.selected(selectedMailbox).block();
+        when(mockMailboxManager.mailboxExists(INBOX, mailboxSession)).thenReturn(Mono.just(true));
+        MessageManager targetMessageManager = mock(MessageManager.class);
+        when(targetMessageManager.getId()).thenReturn(MAILBOX_ID);
+        when(mockMailboxManager.getMailboxReactive(any(MailboxPath.class), any(MailboxSession.class))).thenReturn(Mono.just(targetMessageManager));
+        Mailbox mailbox = mock(Mailbox.class);
+        when(mailbox.getUidValidity()).thenReturn(UID_VALIDITY);
+        when(targetMessageManager.getMailboxEntity()).thenReturn(mailbox);
+        when(mockMailboxManager.copyMessagesReactive(eq(List.of(MessageRange.one(MessageUid.of(3)))), any(MailboxId.class), any(MailboxId.class), eq(mailboxSession)))
+            .thenReturn(Flux.just(MessageRange.one(MessageUid.of(10))));
+
+        testee.process(copyRequest, mockResponder, imapSession);
+
+        verify(mockStatusResponseFactory).taggedOk(any(Tag.class), any(ImapCommand.class), any(HumanReadableText.class),
+            eq(StatusResponse.ResponseCode.copyUid(UID_VALIDITY, new IdRange[] {new IdRange(3)}, new IdRange[] {new IdRange(10)})));
     }
 
     @Test
