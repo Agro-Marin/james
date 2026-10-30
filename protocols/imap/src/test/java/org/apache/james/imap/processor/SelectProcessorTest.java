@@ -20,6 +20,10 @@
 package org.apache.james.imap.processor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 
 import java.io.ByteArrayOutputStream;
 
@@ -28,6 +32,7 @@ import jakarta.mail.util.SharedByteArrayInputStream;
 
 import org.apache.james.core.Username;
 import org.apache.james.imap.api.ImapConstants;
+import org.apache.james.imap.api.ImapSessionState;
 import org.apache.james.imap.api.Tag;
 import org.apache.james.imap.api.message.IdRange;
 import org.apache.james.imap.api.message.UidRange;
@@ -44,6 +49,7 @@ import org.apache.james.imap.message.response.UnpooledStatusResponseFactory;
 import org.apache.james.mailbox.MailboxCounterCorrector;
 import org.apache.james.mailbox.MailboxSession;
 import org.apache.james.mailbox.MessageManager;
+import org.apache.james.mailbox.exception.MailboxException;
 import org.apache.james.mailbox.inmemory.InMemoryMailboxManager;
 import org.apache.james.mailbox.inmemory.manager.InMemoryIntegrationResources;
 import org.apache.james.mailbox.model.MailboxPath;
@@ -53,6 +59,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.google.common.collect.ImmutableList;
+
+import reactor.core.publisher.Mono;
 
 class SelectProcessorTest {
     private static final Username BOB = Username.of("bob");
@@ -78,6 +86,53 @@ class SelectProcessorTest {
         mailboxSession = mailboxManager.createSystemSession(Username.of("bob"));
         mailboxManager.createMailbox(MailboxPath.inbox(BOB), mailboxSession);
         uidValidity = mailboxManager.getMailbox(MailboxPath.inbox(BOB), mailboxSession).getMailboxEntity().getUidValidity();
+    }
+
+    private String select(SelectProcessor processor, FakeImapSession session, String mailboxName) throws Exception {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ImapResponseComposerImpl composer = new ImapResponseComposerImpl(new OutputStreamImapResponseWriter(outputStream));
+        processor.process(new SelectRequest(mailboxName, false,
+                AbstractMailboxSelectionRequest.ClientSpecifiedUidValidity.UNKNOWN, null, null, null, null, new Tag("AA")),
+            new ResponseEncoder(new DefaultImapEncoderFactory(new DefaultLocalizer(), true).buildImapEncoder(), composer),
+            session);
+        composer.flush();
+        return outputStream.toString();
+    }
+
+    private FakeImapSession authenticatedSession() {
+        FakeImapSession session = new FakeImapSession();
+        session.authenticated();
+        session.setMailboxSession(mailboxSession);
+        return session;
+    }
+
+    @Test
+    void aFailedSelectShouldLeaveNoMailboxSelected() throws Exception {
+        FakeImapSession session = authenticatedSession();
+        select(testee, session, "INBOX");
+
+        assertThat(select(testee, session, "nonexistent")).contains("AA NO");
+        assertThat(session.getSelected()).isNull();
+        assertThat(session.getState()).isEqualTo(ImapSessionState.AUTHENTICATED);
+    }
+
+    @Test
+    void aSelectWhoseMailboxFailsToOpenShouldLeaveNoMailboxSelected() throws Exception {
+        MessageManager failingInbox = spy(mailboxManager.getMailbox(MailboxPath.inbox(BOB), mailboxSession));
+        doReturn(Mono.error(new MailboxException("timed out"))).when(failingInbox).getMetaDataReactive(any(), any(), any());
+        InMemoryMailboxManager failingMailboxManager = spy(mailboxManager);
+        doReturn(Mono.just(failingInbox)).when(failingMailboxManager).getMailboxReactive(eq(MailboxPath.inbox(BOB)), any(MailboxSession.class));
+        SelectProcessor processor = new SelectProcessor(failingMailboxManager,
+            InMemoryIntegrationResources.defaultResources().getEventBus(),
+            new UnpooledStatusResponseFactory(),
+            new RecordingMetricFactory(),
+            PathConverter.Factory.DEFAULT,
+            null);
+        FakeImapSession session = authenticatedSession();
+
+        assertThat(select(processor, session, "INBOX")).contains("AA NO");
+        assertThat(session.getSelected()).isNull();
+        assertThat(session.getState()).isEqualTo(ImapSessionState.AUTHENTICATED);
     }
 
     @Test

@@ -109,6 +109,9 @@ abstract class AbstractSelectionProcessor<R extends AbstractMailboxSelectionRequ
         MailboxPath fullMailboxPath = pathConverterFactory.forSession(session).buildFullPath(mailboxName);
 
         return respond(session, fullMailboxPath, request, responder)
+            // RFC 3501 6.3.1: SELECT deselects the current mailbox before attempting the new one, so after a failed
+            // SELECT none is selected, neither the previous one nor the one whose opening failed half way
+            .onErrorResume(e -> session.deselect().then(Mono.error(e)))
             .onErrorResume(MailboxNotFoundException.class, e -> {
                 responder.respond(statusResponseFactory.taggedNo(request.getTag(), request.getCommand(), HumanReadableText.FAILURE_NO_SUCH_MAILBOX));
                 return ReactorUtils.logAsMono(() -> LOGGER.debug("Select failed as mailbox does not exist {}", mailboxName, e));

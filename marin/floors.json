@@ -60,7 +60,7 @@
       },
       "protocols/imap": {
         "skipped": 0,
-        "tests": 2569
+        "tests": 2571
       },
       "protocols/smtp": {
         "skipped": 0,
