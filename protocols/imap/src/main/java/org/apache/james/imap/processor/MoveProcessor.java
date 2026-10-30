@@ -24,8 +24,10 @@ import java.util.List;
 import jakarta.inject.Inject;
 
 import org.apache.james.imap.api.ImapConstants;
+import org.apache.james.imap.api.display.HumanReadableText;
 import org.apache.james.imap.api.message.Capability;
 import org.apache.james.imap.api.message.IdRange;
+import org.apache.james.imap.api.message.response.StatusResponse;
 import org.apache.james.imap.api.message.response.StatusResponseFactory;
 import org.apache.james.imap.api.process.ImapSession;
 import org.apache.james.imap.api.process.SelectedMailbox;
@@ -41,6 +43,7 @@ import org.apache.james.util.MDCBuilder;
 import com.google.common.collect.ImmutableList;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class MoveProcessor extends AbstractMessageRangeProcessor<MoveRequest> implements CapabilityImplementingProcessor {
 
@@ -68,6 +71,14 @@ public class MoveProcessor extends AbstractMessageRangeProcessor<MoveRequest> im
     @Override
     protected String getOperationName() {
         return "Move";
+    }
+
+    // RFC 6851 4.3: the COPYUID of a MOVE comes in an untagged OK, before the EXPUNGE responses for the moved messages
+    @Override
+    protected Mono<Void> respond(MoveRequest request, StatusResponse.ResponseCode copyUid, ImapSession session, Responder responder) {
+        return Mono.fromRunnable(() -> responder.respond(getStatusResponseFactory().untaggedOk(HumanReadableText.MOVED_UIDS, copyUid)))
+            .then(Mono.defer(() -> unsolicitedResponses(session, responder, request.isUseUids())))
+            .then(Mono.fromRunnable(() -> okComplete(request, responder)));
     }
 
     @Override

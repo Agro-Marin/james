@@ -5,7 +5,7 @@
       459
     ],
     "extensions": [
-      6,
+      4,
       75
     ],
     "failing": [
@@ -15,9 +15,7 @@
       "fetch-envelope command 1/2",
       "listext command 20/34",
       "listext command 21/34",
-      "move command 11/13",
       "move command 12/13",
-      "move command 8/13",
       "subscribe command 16/24",
       "subscribe command 23/24"
     ],

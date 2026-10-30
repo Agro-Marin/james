@@ -91,8 +91,7 @@ public abstract class AbstractMessageRangeProcessor<R extends AbstractMessageRan
                     return Mono.empty();
                 } else {
                     return handleRanges(request, session, targetMailbox, mailboxSession)
-                        .flatMap(code -> unsolicitedResponses(session, responder, request.isUseUids())
-                            .then(Mono.fromRunnable(() -> okComplete(request, code, responder))));
+                        .flatMap(copyUid -> respond(request, copyUid, session, responder));
                 }
             })
             .onErrorResume(MessageRangeException.class, e -> {
@@ -115,6 +114,11 @@ public abstract class AbstractMessageRangeProcessor<R extends AbstractMessageRan
                 return ReactorUtils.logAsMono(() -> LOGGER.error("{} failed from mailbox {} to {} for sequence-set {}",
                     getOperationName(), selectedMailboxId(session), targetMailbox, request.getIdSet(), e.getCause()));
             }).then();
+    }
+
+    protected Mono<Void> respond(R request, StatusResponse.ResponseCode copyUid, ImapSession session, Responder responder) {
+        return unsolicitedResponses(session, responder, request.isUseUids())
+            .then(Mono.fromRunnable(() -> okComplete(request, copyUid, responder)));
     }
 
     private Mono<StatusResponse.ResponseCode> handleRanges(R request, ImapSession session, MailboxPath targetMailbox, MailboxSession mailboxSession) {
