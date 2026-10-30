@@ -1,7 +1,7 @@
 {
   "imaptest_scripted": {
     "base": [
-      8,
+      6,
       459
     ],
     "extensions": [
@@ -18,14 +18,12 @@
       "move command 11/13",
       "move command 12/13",
       "move command 8/13",
-      "search-sets command 12/24",
-      "search-sets command 13/24",
       "subscribe command 16/24",
       "subscribe command 23/24"
     ],
     "groups": [
       74,
-      7,
+      6,
       37
     ]
   },
@@ -50,7 +48,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 114
+        "tests": 116
       },
       "mailbox/store": {
         "skipped": 0,
@@ -134,7 +132,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 114
+        "tests": 116
       },
       "mailbox/store": {
         "skipped": 0,
@@ -158,7 +156,7 @@
       },
       "mailbox/scanning-search": {
         "skipped": 2,
-        "tests": 114
+        "tests": 116
       },
       "mailbox/store": {
         "skipped": 0,

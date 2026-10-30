@@ -107,9 +107,13 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
         for (Criterion crit : crits) {
             if (crit instanceof UidCriterion) {
                 return (UidCriterion) crit;
-            } else if (crit instanceof ConjunctionCriterion) {
-                return findConjugatedUidCriterion(((ConjunctionCriterion) crit)
-                        .getCriteria());
+            }
+            // Only an AND narrows what to fetch: under OR the range is one alternative, under NOT the excluded part
+            if (crit instanceof ConjunctionCriterion conjunction && conjunction.getType() == SearchQuery.Conjunction.AND) {
+                UidCriterion nested = findConjugatedUidCriterion(conjunction.getCriteria());
+                if (nested != null) {
+                    return nested;
+                }
             }
         }
         return null;

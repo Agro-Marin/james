@@ -1318,6 +1318,24 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
+    void notUidShouldReturnTheMessagesOutsideTheRange() throws Exception {
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.not(SearchQuery.uid(new SearchQuery.UidRange(m2.getUid(), m8.getUid()))));
+
+        assertThat(messageSearchIndex.search(session, mailbox, searchQuery).toStream())
+            .containsOnly(m1.getUid(), m9.getUid());
+    }
+
+    @Test
+    void orOfUidsShouldReturnTheMessagesOfEitherRange() throws Exception {
+        SearchQuery searchQuery = SearchQuery.of(SearchQuery.or(
+            SearchQuery.uid(new SearchQuery.UidRange(m1.getUid(), m1.getUid())),
+            SearchQuery.uid(new SearchQuery.UidRange(m3.getUid(), m3.getUid()))));
+
+        assertThat(messageSearchIndex.search(session, mailbox, searchQuery).toStream())
+            .containsOnly(m1.getUid(), m3.getUid());
+    }
+
+    @Test
     protected void uidShouldreturnEveryThing() throws Exception {
         SearchQuery.UidRange[] numericRanges = {};
         SearchQuery searchQuery = SearchQuery.of(SearchQuery.uid(numericRanges));
