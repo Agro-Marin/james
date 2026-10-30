@@ -68,8 +68,8 @@ C:
 C: Test 03
 C:
 S: \* OK \[APPENDUID .+ .+\] Replacement Message ready
-S: \* 3 EXISTS
 S: \* 1 EXPUNGE
+S: \* 2 EXISTS
 S: \* 2 RECENT
 S: defg OK REPLACE completed.
 
@@ -95,8 +95,8 @@ C:
 C: Test 04
 C:
 S: \* OK \[APPENDUID .+ .+\] Replacement Message ready
-S: \* 3 EXISTS
 S: \* 1 EXPUNGE
+S: \* 2 EXISTS
 S: \* 2 RECENT
 S: ghij OK REPLACE completed.
 

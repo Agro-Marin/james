@@ -55,6 +55,14 @@ C: a5 STATUS selected (MESSAGES)
 S: \* STATUS "selected" \(MESSAGES 2\)
 S: a5 OK STATUS completed.
 
+# a message moved into the selected mailbox itself is expunged before the EXISTS that counts its copy
+C: a6 MOVE 1 selected
+S: \* OK \[COPYUID \d+ \S+ \S+\] Moved UIDs\.
+S: \* 1 EXPUNGE
+S: \* 2 EXISTS
+S: \* \d+ RECENT
+S: a6 OK (\[.+\] )?MOVE completed.
+
 C: a7 SELECT moved
 S: \* OK \[MAILBOXID \(.+\)\] Ok
 S: \* FLAGS \(\\Answered \\Deleted \\Draft \\Flagged \\Seen\)

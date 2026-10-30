@@ -5,16 +5,15 @@
       460
     ],
     "extensions": [
-      1,
+      0,
       88
     ],
     "failing": [
-      "fetch-body-message-rfc822-mime command 7/14",
-      "move command 12/13"
+      "fetch-body-message-rfc822-mime command 7/14"
     ],
     "groups": [
       74,
-      2,
+      1,
       37
     ]
   },

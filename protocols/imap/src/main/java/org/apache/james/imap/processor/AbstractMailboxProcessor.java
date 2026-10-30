@@ -172,13 +172,9 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
     }
 
     private Mono<Void> unsolicitedResponses(ImapSession session, ImapProcessor.Responder responder, SelectedMailbox selected, boolean omitExpunged, boolean useUid) {
-        return Mono.fromCallable(selected::applyAddedUids)
-            .flatMap(sizeChanged -> sizeChanged ? selected.claimRecent().thenReturn(true) : Mono.just(false))
-            .doOnNext(sizeChanged -> {
-                // New message response
-                if (sizeChanged) {
-                    addExistsResponses(selected, responder);
-                }
+        // Expunges go first, so that EXISTS counts what the client holds after them: a MOVE into the selected mailbox
+        // reads "* 1 EXPUNGE" "* 1 EXISTS", not "* 2 EXISTS" "* 1 EXPUNGE".
+        return Mono.fromRunnable(() -> {
                 // Expunged messages
                 if (!omitExpunged) {
                     final Collection<MessageUid> expungedUids = selected.expungedUids();
@@ -192,7 +188,14 @@ public abstract class AbstractMailboxProcessor<R extends ImapRequest> extends Ab
                         // Only reset the events if we send the EXPUNGE or VANISHED responses. See IMAP-286
                         selected.resetExpungedUids(expungedUids);
                     }
-
+                }
+            })
+            .then(Mono.fromCallable(selected::applyAddedUids))
+            .flatMap(sizeChanged -> sizeChanged ? selected.claimRecent().thenReturn(true) : Mono.just(false))
+            .doOnNext(sizeChanged -> {
+                // New message response
+                if (sizeChanged) {
+                    addExistsResponses(selected, responder);
                 }
                 if (sizeChanged || (selected.isRecentUidRemoved() && !omitExpunged)) {
                     addRecentResponses(selected, responder);
