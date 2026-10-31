@@ -21,10 +21,12 @@ package org.apache.james;
 
 import static org.apache.james.PostgresJamesConfiguration.EventBusImpl.RABBITMQ;
 
+import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.james.data.UsersRepositoryModuleChooser;
 import org.apache.james.eventsourcing.eventstore.EventNestedTypes;
 import org.apache.james.jmap.JMAPListenerModule;
@@ -98,6 +100,8 @@ import org.apache.james.modules.task.PostgresTaskExecutionDetailsProjectionGuice
 import org.apache.james.modules.vault.DeletedMessageVaultRoutesModule;
 import org.apache.james.modules.webadmin.TasksCleanupRoutesModule;
 import org.apache.james.oidc.redis.OidcTokenCacheModuleChooser;
+import org.apache.james.server.core.filesystem.FileSystemImpl;
+import org.apache.james.utils.PropertiesProvider;
 import org.apache.james.vault.VaultConfiguration;
 
 import com.google.common.collect.ImmutableList;
@@ -106,6 +110,9 @@ import com.google.inject.Module;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 import com.google.inject.util.Modules;
+
+import mx.agromarin.james.odoo.OdooConfiguration;
+import mx.agromarin.james.odoo.OdooModule;
 
 public class PostgresJamesServerMain implements JamesServerMain {
 
@@ -201,6 +208,7 @@ public class PostgresJamesServerMain implements JamesServerMain {
             .combineWith(chooseBlobStoreModules(configuration))
             .combineWith(chooseDeletedMessageVaultModules(configuration.getDeletedMessageVaultConfiguration()))
             .combineWith(chooseRLSSupportPostgresMailboxModule(configuration))
+            .combineWith(chooseOdooModule(configuration))
             .overrideWith(chooseJmapModules(configuration))
             .overrideWith(chooseTaskManagerModules(configuration))
             .overrideWith(chooseDropListsModule(configuration));
@@ -211,6 +219,19 @@ public class PostgresJamesServerMain implements JamesServerMain {
             return List.of(new PostgresSearchTextModule());
         }
         return List.of();
+    }
+
+    private static Module chooseOdooModule(PostgresJamesConfiguration configuration) {
+        PropertiesProvider propertiesProvider = new PropertiesProvider(new FileSystemImpl(configuration.directories()),
+            configuration.configurationPath());
+        try {
+            propertiesProvider.getConfiguration(OdooConfiguration.CONFIGURATION_NAME);
+            return new OdooModule();
+        } catch (FileNotFoundException e) {
+            return Modules.EMPTY_MODULE;
+        } catch (ConfigurationException e) {
+            throw new IllegalArgumentException("Cannot read " + OdooConfiguration.CONFIGURATION_NAME + ".properties", e);
+        }
     }
 
     private static List<Module> chooseUsersRepositoryModule(PostgresJamesConfiguration configuration) {

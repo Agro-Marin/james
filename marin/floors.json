@@ -115,6 +115,10 @@
       "server/data/data-postgres": {
         "skipped": 0,
         "tests": 456
+      },
+      "third-party/odoo": {
+        "skipped": 0,
+        "tests": 28
       }
     },
     "pg-jmap": {

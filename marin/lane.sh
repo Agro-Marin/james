@@ -34,7 +34,7 @@ JUNIT_MODULES=(
 )
 PG_MODULES=(
     backends-common/postgres server/data/data-postgres server/data/data-jmap-postgres
-    mailbox/postgres mpt/impl/imap-mailbox/postgres
+    mailbox/postgres mpt/impl/imap-mailbox/postgres third-party/odoo
 )
 TZ_ZONES=(America/Mexico_City America/Monterrey)
 TZ_MODULES=(mailbox/store mailbox/memory mailbox/scanning-search mailbox/lucene)

@@ -36,6 +36,7 @@
         <module>clamav</module>
         <module>crowdsec</module>
         <module>elasticsearch</module>
+        <module>odoo</module>
         <module>rspamd</module>
         <module>spamassassin</module>
     </modules>
