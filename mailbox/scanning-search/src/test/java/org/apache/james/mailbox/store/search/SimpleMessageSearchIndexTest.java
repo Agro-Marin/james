@@ -72,166 +72,103 @@ class SimpleMessageSearchIndexTest extends AbstractMessageSearchIndexTest {
         return InMemoryMessageId.of(1000);
     }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void uidShouldreturnEveryThing() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void sortOnCcShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void sortOnFromShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void addressShouldReturnUidHavingRightRecipientWhenBccIsSpecified() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void orShouldReturnResultsMatchinganyRequests() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void internalDateBeforeShouldReturnMessagesBeforeAGivenDate() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void saveDateBeforeShouldReturnMessagesBeforeAGivenDate() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void saveDateAfterShouldReturnMessagesAfterAGivenDate() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void headerContainsShouldReturnUidsOfMessageHavingThisHeaderWithTheSpecifiedValue() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void internalDateAfterShouldReturnMessagesAfterAGivenDate() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void youShouldBeAbleToSpecifySeveralCriterionOnASingleQuery() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void headerExistsShouldReturnUidsOfMessageHavingThisHeader() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void modSeqLessThanShouldReturnUidsOfMessageHavingAGreaterModSeq() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void addressShouldReturnUidHavingRightRecipientWhenCcIsSpecified() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void andShouldReturnResultsMatchingBothRequests() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void addressShouldReturnUidHavingRightExpeditorWhenFromIsSpecified() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void bodyContainsShouldReturnUidOfMessageContainingBothTerms() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void headerDateBeforeShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void addressShouldReturnUidHavingRightRecipientWhenToIsSpecified() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void sortOnToShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void revertSortingShouldReturnElementsInAReversedOrder() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void headerDateAfterShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void sortOnSubjectShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void modSeqGreaterThanShouldReturnUidsOfMessageHavingAGreaterModSeq() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void notShouldReturnResultsThatDoNotMatchAQuery() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void headerDateOnShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void sortOnSizeShouldWork() {
-    }
 
-    @Disabled("JAMES-1799: ignoring failing test after generalizing OpenSearch test suite to other mailbox search backends")
-    @Override
-    public void sortShouldOrderMessages() {
-    }
 
-    @Disabled("MAILBOX-273: failing test on memory (intended for ES)")
-    @Override
-    public void multimailboxSearchShouldReturnUidOfMessageWithExpectedFromInTwoMailboxes() {
-    }
 
-    @Disabled("JAMES-2241: memory does not handle header with dots indexation (intended for ES)")
-    @Override
-    public void headerWithDotsShouldBeIndexed() {
-    }
     
+    @Override
+    protected boolean supportsCollapseThreads() {
+        return true;
+    }
+
+    @Test
+    @Disabled(RECENT_IS_THE_SESSIONS)
+    @Override
+    protected void flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent() {
+    }
+
+    @Test
+    @Disabled(RECENT_IS_THE_SESSIONS)
+    @Override
+    protected void flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent() {
+    }
+
+    @Test
+    @Disabled(EMPTY_UID_SET_MATCHES_NOTHING)
+    @Override
+    protected void uidShouldreturnEveryThing() {
+    }
+
+    @Test
+    @Disabled(SORT_ON_ADDR_MAILBOX)
+    @Override
+    protected void sortOnCcShouldWork() {
+    }
+
+    @Test
+    @Disabled(SORT_ON_ADDR_MAILBOX)
+    @Override
+    protected void sortOnFromShouldWork() {
+    }
+
+    @Test
+    @Disabled(SORT_ON_ADDR_MAILBOX)
+    @Override
+    protected void sortOnToShouldWork() {
+    }
+
+    @Test
+    @Disabled(BODY_IS_A_SUBSTRING)
+    @Override
+    protected void bodyContainsShouldReturnUidOfMessageContainingBothTerms() {
+    }
+
+    @Test
+    @Disabled(SENT_DATE_IS_NO_HEADER)
+    @Override
+    protected void headerDateAfterShouldWork() {
+    }
+
+    @Test
+    @Disabled(SENT_DATE_IS_NO_HEADER)
+    @Override
+    protected void headerDateBeforeShouldWork() {
+    }
+
+    @Test
+    @Disabled(SENT_DATE_IS_NO_HEADER)
+    @Override
+    protected void headerDateOnShouldWork() {
+    }
+
     @Test
     public void canCompareFetchTypes() {
         assertThat(FetchType.values()).containsExactly(FetchType.METADATA, FetchType.HEADERS, FetchType.ATTACHMENTS_METADATA, FetchType.FULL);

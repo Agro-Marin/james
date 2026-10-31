@@ -40,133 +40,89 @@
       "verdict": "fix",
       "why": "phase 4: case-insensitive vault search across locales, before the vault is offered"
     },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightExpeditorWhenFromIsSpecified": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    "mailbox/postgres::PostgresMessageSearchIndexTest#bodyContainsShouldReturnUidOfMessageContainingBothTerms": {
+      "verdict": "keep",
+      "why": "IMAP BODY matches the string as given (RFC 3501 6.4.4); the test expects each word matched apart, as a full-text index does"
     },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightRecipientWhenBccIsSpecified": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    "mailbox/postgres::PostgresMessageSearchIndexTest#flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent": {
+      "verdict": "keep",
+      "why": "\\Recent is the IMAP session's (RFC 3501 2.3.2): the scanning search takes it from the query's recent UIDs, which IMAP fills from the selected mailbox; the test expects the stored flag"
     },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightRecipientWhenCcIsSpecified": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    "mailbox/postgres::PostgresMessageSearchIndexTest#flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent": {
+      "verdict": "keep",
+      "why": "\\Recent is the IMAP session's (RFC 3501 2.3.2): the scanning search takes it from the query's recent UIDs, which IMAP fills from the selected mailbox; the test expects the stored flag"
     },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#addressShouldReturnUidHavingRightRecipientWhenToIsSpecified": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    "mailbox/postgres::PostgresMessageSearchIndexTest#headerDateAfterShouldWork": {
+      "verdict": "keep",
+      "why": "\"sentDate\" is OpenSearch's field for the Date header, no header; the sentDate* tests search the Date header itself"
     },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#andShouldReturnResultsMatchingBothRequests": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+    "mailbox/postgres::PostgresMessageSearchIndexTest#headerDateBeforeShouldWork": {
+      "verdict": "keep",
+      "why": "\"sentDate\" is OpenSearch's field for the Date header, no header; the sentDate* tests search the Date header itself"
+    },
+    "mailbox/postgres::PostgresMessageSearchIndexTest#headerDateOnShouldWork": {
+      "verdict": "keep",
+      "why": "\"sentDate\" is OpenSearch's field for the Date header, no header; the sentDate* tests search the Date header itself"
+    },
+    "mailbox/postgres::PostgresMessageSearchIndexTest#searchWithPDFAttachmentShouldReturnMailsWhenAttachmentContentMatches": {
+      "verdict": "keep",
+      "why": "PDF text needs Tika, and the deployed app runs without it (JsoupTextExtractor)"
+    },
+    "mailbox/postgres::PostgresMessageSearchIndexTest#sortOnCcShouldWork": {
+      "verdict": "keep",
+      "why": "MailboxFrom, MailboxCc and MailboxTo sort on the first address's addr-mailbox, a missing one first (RFC 5256, and SortClause's own definition); the test expects display names"
+    },
+    "mailbox/postgres::PostgresMessageSearchIndexTest#sortOnFromShouldWork": {
+      "verdict": "keep",
+      "why": "MailboxFrom, MailboxCc and MailboxTo sort on the first address's addr-mailbox, a missing one first (RFC 5256, and SortClause's own definition); the test expects display names"
+    },
+    "mailbox/postgres::PostgresMessageSearchIndexTest#sortOnToShouldWork": {
+      "verdict": "keep",
+      "why": "MailboxFrom, MailboxCc and MailboxTo sort on the first address's addr-mailbox, a missing one first (RFC 5256, and SortClause's own definition); the test expects display names"
+    },
+    "mailbox/postgres::PostgresMessageSearchIndexTest#uidShouldreturnEveryThing": {
+      "verdict": "keep",
+      "why": "an empty UID set matches nothing: IMAP builds one for an empty mailbox or a sequence set naming no message"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#bodyContainsShouldReturnUidOfMessageContainingBothTerms": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "IMAP BODY matches the string as given (RFC 3501 6.4.4); the test expects each word matched apart, as a full-text index does"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "\\Recent is the IMAP session's (RFC 3501 2.3.2): the scanning search takes it from the query's recent UIDs, which IMAP fills from the selected mailbox; the test expects the stored flag"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerContainsShouldReturnUidsOfMessageHavingThisHeaderWithTheSpecifiedValue": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "\\Recent is the IMAP session's (RFC 3501 2.3.2): the scanning search takes it from the query's recent UIDs, which IMAP fills from the selected mailbox; the test expects the stored flag"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerDateAfterShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "\"sentDate\" is OpenSearch's field for the Date header, no header; the sentDate* tests search the Date header itself"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerDateBeforeShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "\"sentDate\" is OpenSearch's field for the Date header, no header; the sentDate* tests search the Date header itself"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerDateOnShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerExistsShouldReturnUidsOfMessageHavingThisHeader": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#headerWithDotsShouldBeIndexed": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#internalDateAfterShouldReturnMessagesAfterAGivenDate": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#internalDateBeforeShouldReturnMessagesBeforeAGivenDate": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#modSeqGreaterThanShouldReturnUidsOfMessageHavingAGreaterModSeq": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#modSeqLessThanShouldReturnUidsOfMessageHavingAGreaterModSeq": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#multimailboxSearchShouldReturnUidOfMessageWithExpectedFromInTwoMailboxes": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#notShouldReturnResultsThatDoNotMatchAQuery": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#orShouldReturnResultsMatchinganyRequests": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#revertSortingShouldReturnElementsInAReversedOrder": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#saveDateAfterShouldReturnMessagesAfterAGivenDate": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#saveDateBeforeShouldReturnMessagesBeforeAGivenDate": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "\"sentDate\" is OpenSearch's field for the Date header, no header; the sentDate* tests search the Date header itself"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnCcShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "MailboxFrom, MailboxCc and MailboxTo sort on the first address's addr-mailbox, a missing one first (RFC 5256, and SortClause's own definition); the test expects display names"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnFromShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnSizeShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnSubjectShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "MailboxFrom, MailboxCc and MailboxTo sort on the first address's addr-mailbox, a missing one first (RFC 5256, and SortClause's own definition); the test expects display names"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortOnToShouldWork": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#sortShouldOrderMessages": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "MailboxFrom, MailboxCc and MailboxTo sort on the first address's addr-mailbox, a missing one first (RFC 5256, and SortClause's own definition); the test expects display names"
     },
     "mailbox/scanning-search::SimpleMessageSearchIndexTest#uidShouldreturnEveryThing": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
-    },
-    "mailbox/scanning-search::SimpleMessageSearchIndexTest#youShouldBeAbleToSpecifySeveralCriterionOnASingleQuery": {
-      "verdict": "fix",
-      "why": "phase 3: the PostgreSQL search index replaces scanning and must pass the whole MessageSearchIndexContract, these included"
+      "verdict": "keep",
+      "why": "an empty UID set matches nothing: IMAP builds one for an empty mailbox or a sequence set naming no message"
     },
     "metrics/metrics-logger::DefaultMetricFactoryTest#generateWithSameNameShouldReturnMetricsWithCorrelatedCounter": {
       "verdict": "keep",

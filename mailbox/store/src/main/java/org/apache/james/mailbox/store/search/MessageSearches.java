@@ -29,10 +29,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import jakarta.mail.Flags;
@@ -51,6 +53,7 @@ import org.apache.james.mailbox.model.SearchQuery;
 import org.apache.james.mailbox.model.SearchQuery.AddressType;
 import org.apache.james.mailbox.model.SearchQuery.DateResolution;
 import org.apache.james.mailbox.model.SearchQuery.UidRange;
+import org.apache.james.mailbox.model.ThreadId;
 import org.apache.james.mailbox.store.ResultUtils;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
 import org.apache.james.mailbox.store.search.comparator.CombinedComparator;
@@ -105,9 +108,11 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
                 LOGGER.error("Unable to search message {}", m.getUid(), e);
             }
         }
+        Set<ThreadId> seenThreads = new HashSet<>();
         return builder.build()
             .stream()
             .sorted(CombinedComparator.create(query.getSorts()))
+            .filter(mailboxMessage -> !query.shouldCollapseThreads() || seenThreads.add(mailboxMessage.getThreadId()))
             .map(mailboxMessage -> new SimpleMessageSearchIndex.SearchResult(
                 Optional.of(mailboxMessage.getMessageId()),
                 mailboxMessage.getMailboxId(),

@@ -142,6 +142,9 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
             || crit instanceof SearchQuery.SubjectCriterion) {
             return FetchType.HEADERS;
         }
+        if (crit instanceof SearchQuery.AttachmentCriterion) {
+            return FetchType.ATTACHMENTS_METADATA;
+        }
         return FetchType.METADATA;
     }
     

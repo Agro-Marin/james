@@ -35,8 +35,8 @@
         "tests": 660
       },
       "mailbox/scanning-search": {
-        "skipped": 2,
-        "tests": 116
+        "skipped": 10,
+        "tests": 148
       },
       "mailbox/store": {
         "skipped": 0,
@@ -101,8 +101,8 @@
         "tests": 58
       },
       "mailbox/postgres": {
-        "skipped": 12,
-        "tests": 782
+        "skipped": 23,
+        "tests": 900
       },
       "mpt/impl/imap-mailbox/postgres": {
         "skipped": 0,
@@ -127,8 +127,8 @@
         "tests": 660
       },
       "mailbox/scanning-search": {
-        "skipped": 2,
-        "tests": 116
+        "skipped": 10,
+        "tests": 148
       },
       "mailbox/store": {
         "skipped": 0,
@@ -151,8 +151,8 @@
         "tests": 660
       },
       "mailbox/scanning-search": {
-        "skipped": 2,
-        "tests": 116
+        "skipped": 10,
+        "tests": 148
       },
       "mailbox/store": {
         "skipped": 0,

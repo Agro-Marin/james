@@ -100,6 +100,19 @@ public abstract class AbstractMessageSearchIndexTest {
     private static final boolean NOT_RECENT = false;
 
     protected static final String INBOX = "INBOX";
+
+    protected static final String RECENT_IS_THE_SESSIONS = "\\Recent belongs to the IMAP session (RFC 3501 2.3.2): a scanning search "
+        + "takes it from the query's recent UIDs, which IMAP fills from the selected mailbox, not from the stored flag this test sets";
+    protected static final String EMPTY_UID_SET_MATCHES_NOTHING = "An empty UID set matches no message: IMAP's SEARCH builds one "
+        + "for an empty mailbox or a sequence set naming no message, where answering every message would be wrong";
+    protected static final String SORT_ON_ADDR_MAILBOX = "SortClause.MailboxFrom, MailboxCc and MailboxTo sort on the addr-mailbox of the "
+        + "first address, a missing one first (RFC 5256 3, and SortClause's own definition); this test expects the display name, "
+        + "a missing Cc last, and misreads mail4.eml's To (a-mailet-api@james.apache.org)";
+    protected static final String BODY_IS_A_SUBSTRING = "IMAP's BODY key matches the string as given (RFC 3501 6.4.4); this test expects "
+        + "each word matched apart, as a full-text index does";
+    protected static final String SENT_DATE_IS_NO_HEADER = "\"sentDate\" is OpenSearch's field for the Date header, no header itself; "
+        + "the sentDate*ShouldCompareTheDateHeaderOwnDate tests search the Date header itself";
+
     protected static final Username OTHERUSER = Username.of("otheruser");
     protected static final Username USERNAME = Username.of("benwa");
     protected static final Username QUAN = USERNAME.of("quan");
@@ -675,7 +688,7 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
-    void flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent() throws MailboxException {
+    protected void flagIsSetShouldReturnUidOfMessageMarkedAsRecentWhenUsedWithFlagRecent() throws MailboxException {
         // Only message 7 is not marked as RECENT
         SearchQuery searchQuery = SearchQuery.of(SearchQuery.flagIsSet(Flags.Flag.RECENT));
 
@@ -844,7 +857,7 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
-    void flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent() throws MailboxException {
+    protected void flagIsUnSetShouldReturnUidOfMessageNotMarkedAsRecentWhenUsedWithFlagRecent() throws MailboxException {
         // Only message 7 is not marked as RECENT
         SearchQuery searchQuery = SearchQuery.of(SearchQuery.flagIsUnSet(Flags.Flag.RECENT));
 
@@ -1399,7 +1412,7 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
-    void headerDateAfterShouldWork() throws Exception {
+    protected void headerDateAfterShouldWork() throws Exception {
         // Date : 2015/06/04 11:00:00.000 ( Paris time zone )
         SearchQuery searchQuery = SearchQuery.builder()
             .andCriteria(SearchQuery.headerDateAfter("sentDate", new Date(1433408400000L), DateResolution.Second))
@@ -1411,7 +1424,7 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
-    void headerDateBeforeShouldWork() throws Exception {
+    protected void headerDateBeforeShouldWork() throws Exception {
         // Date : 2015/06/01 00:00:00.000 ( Paris time zone )
         SearchQuery searchQuery = SearchQuery.builder()
             .andCriteria(SearchQuery.headerDateBefore("sentDate", new Date(1433109600000L), DateResolution.Day))
@@ -1423,7 +1436,7 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
-    void headerDateOnShouldWork() throws Exception {
+    protected void headerDateOnShouldWork() throws Exception {
         // Date : 2015/06/02 08:00:00.000 ( Paris time zone )
         SearchQuery searchQuery = SearchQuery.builder()
             .andCriteria(SearchQuery.headerDateOn("sentDate", new Date(1433224800000L), DateResolution.Day))
@@ -1578,7 +1591,7 @@ public abstract class AbstractMessageSearchIndexTest {
     }
 
     @Test
-    void searchWithPDFAttachmentShouldReturnMailsWhenAttachmentContentMatches() throws Exception {
+    protected void searchWithPDFAttachmentShouldReturnMailsWhenAttachmentContentMatches() throws Exception {
         assumeTrue(storeMailboxManager.getSupportedSearchCapabilities().contains(MailboxManager.SearchCapabilities.Attachment));
         byte[] attachmentContent = ClassLoaderUtils.getSystemResourceAsByteArray("eml/attachment.pdf");
         Multipart multipart = MultipartBuilder.create("mixed")
@@ -1948,8 +1961,8 @@ public abstract class AbstractMessageSearchIndexTest {
 
     private SimpleMailboxMessage createMessage(Mailbox mailbox, ThreadId threadId, Date date) {
         MessageId messageId = messageIdFactory.generate();
-        String content = "Some content";
-        int bodyStart = 16;
+        String content = "Subject: thread\r\n\r\nSome content";
+        int bodyStart = content.indexOf("Some content");
         return new SimpleMailboxMessage(messageId,
             threadId,
             date,
