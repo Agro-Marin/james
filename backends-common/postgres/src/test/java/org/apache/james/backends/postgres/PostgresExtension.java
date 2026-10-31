@@ -151,6 +151,8 @@ public class PostgresExtension implements GuiceModuleTestExtension {
     private void querySettingExtension() {
         SERVER.execute(SERVER.scoped(DEFAULT_DATABASE), selectedDatabase.dbName(),
             String.format("CREATE EXTENSION IF NOT EXISTS hstore SCHEMA %s", selectedDatabase.schema()));
+        SERVER.execute(SERVER.scoped(DEFAULT_DATABASE), selectedDatabase.dbName(),
+            String.format("CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA %s", selectedDatabase.schema()));
     }
 
     private void initPostgresSession() {

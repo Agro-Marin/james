@@ -24,6 +24,7 @@ import org.apache.james.mailbox.postgres.mail.PostgresAttachmentDataDefinition;
 import org.apache.james.mailbox.postgres.mail.PostgresMailboxDataDefinition;
 import org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition;
 import org.apache.james.mailbox.postgres.mail.dao.PostgresThreadDataDefinition;
+import org.apache.james.mailbox.postgres.search.PostgresSearchTextDataDefinition;
 import org.apache.james.mailbox.postgres.user.PostgresSubscriptionDataDefinition;
 
 public interface PostgresMailboxAggregateDataDefinition {
@@ -34,5 +35,6 @@ public interface PostgresMailboxAggregateDataDefinition {
         PostgresMessageDataDefinition.MODULE,
         PostgresMailboxAnnotationDataDefinition.MODULE,
         PostgresAttachmentDataDefinition.MODULE,
-        PostgresThreadDataDefinition.MODULE);
+        PostgresThreadDataDefinition.MODULE,
+        PostgresSearchTextDataDefinition.MODULE);
 }

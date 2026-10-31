@@ -77,13 +77,20 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
     private final MailboxMapperFactory mailboxMapperFactory;
     private final TextExtractor textExtractor;
     private final AttachmentContentLoader attachmentContentLoader;
+    private final SearchCandidates searchCandidates;
 
     @Inject
-    public SimpleMessageSearchIndex(MessageMapperFactory messageMapperFactory, MailboxMapperFactory mailboxMapperFactory, TextExtractor textExtractor, AttachmentContentLoader attachmentContentLoader) {
+    public SimpleMessageSearchIndex(MessageMapperFactory messageMapperFactory, MailboxMapperFactory mailboxMapperFactory, TextExtractor textExtractor,
+                                    AttachmentContentLoader attachmentContentLoader, SearchCandidates searchCandidates) {
         this.messageMapperFactory = messageMapperFactory;
         this.mailboxMapperFactory = mailboxMapperFactory;
         this.textExtractor = textExtractor;
         this.attachmentContentLoader = attachmentContentLoader;
+        this.searchCandidates = searchCandidates;
+    }
+
+    public SimpleMessageSearchIndex(MessageMapperFactory messageMapperFactory, MailboxMapperFactory mailboxMapperFactory, TextExtractor textExtractor, AttachmentContentLoader attachmentContentLoader) {
+        this(messageMapperFactory, mailboxMapperFactory, textExtractor, attachmentContentLoader, SearchCandidates.ALL);
     }
     
     @Override
@@ -194,7 +201,9 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
         MessageSearches matcher = new MessageSearches(Collections.emptyIterator(), query, textExtractor, attachmentContentLoader, session);
         FetchType criteriaFetchType = getFetchTypeForCriteria(query.getCriteria());
         FetchType sortFetchType = getFetchTypeForSorts(query.getSorts());
-        List<MessageRange> ranges = rangesToFetch(query);
+        List<MessageRange> ranges = searchCandidates.of(session, mailbox, query)
+            .map(MessageRange::toRanges)
+            .orElseGet(() -> rangesToFetch(query));
 
         if (criteriaFetchType != FetchType.FULL) {
             SortedSet<MailboxMessage> hits = new TreeSet<>();

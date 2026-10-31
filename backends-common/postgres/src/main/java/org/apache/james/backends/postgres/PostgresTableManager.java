@@ -81,9 +81,9 @@ public class PostgresTableManager implements Startable {
 
     public Mono<Void> initializePostgresExtension() {
         return Mono.usingWhen(extensionConnectionSupplier.get(), // Not pooled: r2dbc only registers the hstore codec on connections opened after the extension exists
-            connection -> Flux.from(connection.createStatement("CREATE EXTENSION IF NOT EXISTS hstore")
-                    .execute())
-                .flatMap(Result::getRowsUpdated)
+            connection -> Flux.just("CREATE EXTENSION IF NOT EXISTS hstore", "CREATE EXTENSION IF NOT EXISTS pg_trgm")
+                .concatMap(statement -> Flux.from(connection.createStatement(statement).execute())
+                    .flatMap(Result::getRowsUpdated))
                 .then(),
             Connection::close);
     }

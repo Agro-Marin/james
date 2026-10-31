@@ -33,8 +33,11 @@ import org.apache.james.events.EventBusTestFixture;
 import org.apache.james.events.InVMEventBus;
 import org.apache.james.events.MemoryEventDeadLetters;
 import org.apache.james.events.delivery.InVmEventDelivery;
+import org.apache.james.mailbox.AttachmentContentLoader;
+import org.apache.james.mailbox.SessionProvider;
 import org.apache.james.mailbox.StringBackedAttachmentIdFactory;
 import org.apache.james.mailbox.acl.UnionMailboxACLResolver;
+import org.apache.james.mailbox.extractor.TextExtractor;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageId;
 import org.apache.james.mailbox.model.SearchQuery;
@@ -54,6 +57,7 @@ import org.apache.james.mailbox.store.mail.NaiveThreadIdGuessingAlgorithm;
 import org.apache.james.mailbox.store.mail.model.impl.MessageParserImpl;
 import org.apache.james.mailbox.store.quota.QuotaComponents;
 import org.apache.james.mailbox.store.search.AbstractMessageSearchIndexTest;
+import org.apache.james.mailbox.store.search.SearchCandidates;
 import org.apache.james.mailbox.store.search.SimpleMessageSearchIndex;
 import org.apache.james.metrics.tests.RecordingMetricFactory;
 import org.apache.james.server.blob.deduplication.DeDuplicationBlobStore;
@@ -84,8 +88,10 @@ class PostgresMessageSearchIndexTest extends AbstractMessageSearchIndexTest {
         SessionProviderImpl sessionProvider = new SessionProviderImpl(null, null);
         QuotaComponents quotaComponents = QuotaComponents.disabled(sessionProvider, mapperFactory);
         AtomicReference<StoreAttachmentManager> attachmentManager = new AtomicReference<>();
-        SimpleMessageSearchIndex searchIndex = new SimpleMessageSearchIndex(mapperFactory, mapperFactory, new JsoupTextExtractor(),
-            (attachment, mailboxSession) -> attachmentManager.get().load(attachment, mailboxSession));
+        AttachmentContentLoader attachmentContentLoader = (attachment, mailboxSession) -> attachmentManager.get().load(attachment, mailboxSession);
+        TextExtractor textExtractor = new JsoupTextExtractor();
+        SimpleMessageSearchIndex searchIndex = new SimpleMessageSearchIndex(mapperFactory, mapperFactory, textExtractor,
+            attachmentContentLoader, searchCandidates());
 
         PostgresMailboxManager mailboxManager = new PostgresMailboxManager(mapperFactory, sessionProvider,
             new MessageParserImpl(), new PostgresMessageId.Factory(), inVMEventBus,
@@ -93,6 +99,7 @@ class PostgresMessageSearchIndexTest extends AbstractMessageSearchIndexTest {
             quotaComponents, searchIndex, new NaiveThreadIdGuessingAlgorithm(),
             PreDeletionHooks.NO_PRE_DELETION_HOOK, clock);
 
+        registerListeners(inVMEventBus, mapperFactory, sessionProvider, textExtractor, attachmentContentLoader);
         storeMailboxManager = mailboxManager;
         messageIdManager = new StoreMessageIdManager(mailboxManager, mapperFactory, inVMEventBus,
             quotaComponents.getQuotaManager(), quotaComponents.getQuotaRootResolver(), PreDeletionHooks.NO_PRE_DELETION_HOOK);
@@ -100,6 +107,14 @@ class PostgresMessageSearchIndexTest extends AbstractMessageSearchIndexTest {
         messageSearchIndex = searchIndex;
         eventBus = inVMEventBus;
         messageIdFactory = new PostgresMessageId.Factory();
+    }
+
+    protected SearchCandidates searchCandidates() {
+        return SearchCandidates.ALL;
+    }
+
+    protected void registerListeners(InVMEventBus eventBus, PostgresMailboxSessionMapperFactory mapperFactory, SessionProvider sessionProvider,
+                                     TextExtractor textExtractor, AttachmentContentLoader attachmentContentLoader) {
     }
 
     @Override

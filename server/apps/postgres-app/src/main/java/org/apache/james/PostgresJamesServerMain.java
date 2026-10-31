@@ -58,6 +58,7 @@ import org.apache.james.modules.mailbox.DefaultEventModule;
 import org.apache.james.modules.mailbox.PostgresDeletedMessageVaultModule;
 import org.apache.james.modules.mailbox.PostgresMailboxModule;
 import org.apache.james.modules.mailbox.PostgresMemoryContentDeletionEventBusModule;
+import org.apache.james.modules.mailbox.PostgresSearchTextModule;
 import org.apache.james.modules.mailbox.RLSSupportPostgresMailboxModule;
 import org.apache.james.modules.mailbox.TikaMailboxModule;
 import org.apache.james.modules.plugins.QuotaMailingModule;
@@ -195,6 +196,7 @@ public class PostgresJamesServerMain implements JamesServerMain {
         return GuiceJamesServer.forConfiguration(configuration)
             .combineWith(POSTGRES_MODULE_AGGREGATE.apply(configuration))
             .combineWith(SearchModuleChooser.chooseModules(searchConfiguration))
+            .combineWith(chooseSearchTextModules(searchConfiguration))
             .combineWith(chooseUsersRepositoryModule(configuration))
             .combineWith(chooseBlobStoreModules(configuration))
             .combineWith(chooseDeletedMessageVaultModules(configuration.getDeletedMessageVaultConfiguration()))
@@ -202,6 +204,13 @@ public class PostgresJamesServerMain implements JamesServerMain {
             .overrideWith(chooseJmapModules(configuration))
             .overrideWith(chooseTaskManagerModules(configuration))
             .overrideWith(chooseDropListsModule(configuration));
+    }
+
+    private static List<Module> chooseSearchTextModules(SearchConfiguration searchConfiguration) {
+        if (searchConfiguration.getImplementation() == SearchConfiguration.Implementation.Scanning) {
+            return List.of(new PostgresSearchTextModule());
+        }
+        return List.of();
     }
 
     private static List<Module> chooseUsersRepositoryModule(PostgresJamesConfiguration configuration) {

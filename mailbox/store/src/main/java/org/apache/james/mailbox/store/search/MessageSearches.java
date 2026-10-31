@@ -255,11 +255,12 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
     private boolean isInAttachments(String value, List<MessageAttachmentMetadata> attachments) {
         return attachments.stream()
             .map(MessageAttachmentMetadata::getAttachment)
-            .flatMap(attachment -> toAttachmentContent(attachment, mailboxSession))
+            .flatMap(attachment -> attachmentText(attachment, mailboxSession, attachmentContentLoader, textExtractor))
             .anyMatch(string -> string.contains(value));
     }
 
-    private Stream<String> toAttachmentContent(AttachmentMetadata attachment, MailboxSession mailboxSession) {
+    static Stream<String> attachmentText(AttachmentMetadata attachment, MailboxSession mailboxSession,
+                                         AttachmentContentLoader attachmentContentLoader, TextExtractor textExtractor) {
         try (InputStream rawData = attachmentContentLoader.load(attachment, mailboxSession)) {
             return textExtractor
                     .extractContent(
@@ -425,7 +426,7 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
             .contains(searchedText.toUpperCase(Locale.US));
     }
 
-    private String encodeAndUnscramble(Mailbox mailbox) {
+    static String encodeAndUnscramble(Mailbox mailbox) {
         return MimeUtil.unscrambleHeaderValue(
             AddressFormatter.DEFAULT.encode(mailbox));
     }

@@ -43,6 +43,7 @@ import org.apache.james.mailbox.searchhighligt.SearchSnippet;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
 import org.apache.james.mailbox.store.search.ListeningMessageSearchIndex;
 import org.apache.james.mailbox.store.search.MessageSearchIndex;
+import org.apache.james.mailbox.store.search.SearchCandidates;
 import org.apache.james.mailbox.store.search.SimpleMessageSearchIndex;
 import org.apache.james.modules.mailbox.OpenSearchClientModule;
 import org.apache.james.modules.mailbox.OpenSearchDisabledModule;
@@ -58,6 +59,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import com.google.inject.multibindings.OptionalBinder;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -138,6 +140,8 @@ public class SearchModuleChooser {
         @Override
         protected void configure() {
             bind(MessageSearchIndex.class).to(SimpleMessageSearchIndex.class);
+            OptionalBinder.newOptionalBinder(binder(), SearchCandidates.class)
+                .setDefault().toInstance(SearchCandidates.ALL);
             bind(FakeMessageSearchIndex.class).in(Scopes.SINGLETON);
             bind(ListeningMessageSearchIndex.class).to(FakeMessageSearchIndex.class);
         }
