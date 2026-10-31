@@ -32,16 +32,4 @@ public class PostgresConcurrentSessionsTest extends ConcurrentSessions {
     protected ImapHostSystem createImapHostSystem() {
         return hostSystemExtension.getHostSystem();
     }
-
-    @Override
-    public void testConcurrentFetchResponseITALY() {
-    }
-
-    @Override
-    public void testConcurrentFetchResponseKOREA() {
-    }
-
-    @Override
-    public void testConcurrentFetchResponseUS() {
-    }
 }

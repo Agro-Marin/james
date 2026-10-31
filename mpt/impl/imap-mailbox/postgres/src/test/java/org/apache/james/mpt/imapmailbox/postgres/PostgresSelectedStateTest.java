@@ -22,7 +22,6 @@ package org.apache.james.mpt.imapmailbox.postgres;
 import org.apache.james.mpt.api.ImapHostSystem;
 import org.apache.james.mpt.imapmailbox.postgres.host.PostgresHostSystemExtension;
 import org.apache.james.mpt.imapmailbox.suite.SelectedState;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 public class PostgresSelectedStateTest extends SelectedState {
@@ -32,34 +31,5 @@ public class PostgresSelectedStateTest extends SelectedState {
     @Override
     protected ImapHostSystem createImapHostSystem() {
         return hostSystemExtension.getHostSystem();
-    }
-
-    @Override
-    public void testCopyITALY() {
-    }
-
-    @Override
-    public void testCopyKOREA() {
-    }
-
-    @Override
-    public void testCopyUS() {
-    }
-
-    @Override
-    public void testUidITALY() {
-    }
-
-    @Override
-    public void testUidKOREA() {
-    }
-
-    @Override
-    public void testUidUS() {
-    }
-
-    @Override
-    @Disabled("SEARCH save date just return empty result for JPA")
-    public void testSearchSaveDate() {
     }
 }

@@ -106,7 +106,7 @@
       },
       "mpt/impl/imap-mailbox/postgres": {
         "skipped": 0,
-        "tests": 320
+        "tests": 331
       },
       "server/data/data-jmap-postgres": {
         "skipped": 0,
@@ -115,6 +115,12 @@
       "server/data/data-postgres": {
         "skipped": 0,
         "tests": 456
+      }
+    },
+    "pg-jmap": {
+      "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests": {
+        "skipped": 2,
+        "tests": 139
       }
     },
     "tz-America_Mexico_City": {
@@ -141,6 +147,22 @@
         "tests": 274
       }
     },
+    "tz-America_Mexico_City-pg": {
+      "mailbox/postgres": {
+        "skipped": 11,
+        "tests": 118
+      },
+      "mpt/impl/imap-mailbox/postgres": {
+        "skipped": 0,
+        "tests": 15
+      }
+    },
+    "tz-America_Mexico_City-pg-jmap": {
+      "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests": {
+        "skipped": 2,
+        "tests": 139
+      }
+    },
     "tz-America_Monterrey": {
       "mailbox/lucene": {
         "skipped": 0,
@@ -164,6 +186,22 @@
         "skipped": 8,
         "tests": 274
       }
+    },
+    "tz-America_Monterrey-pg": {
+      "mailbox/postgres": {
+        "skipped": 11,
+        "tests": 118
+      },
+      "mpt/impl/imap-mailbox/postgres": {
+        "skipped": 0,
+        "tests": 15
+      }
+    },
+    "tz-America_Monterrey-pg-jmap": {
+      "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests": {
+        "skipped": 2,
+        "tests": 139
+      }
     }
   },
   "junit_failing": {
@@ -172,14 +210,19 @@
       "server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests::org.apache.james.jmap.rfc8621.memory.MemoryVacationRelayIntegrationTest#"
     ],
     "pg": [],
+    "pg-jmap": [],
     "tz-America_Mexico_City": [
       "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest#"
     ],
     "tz-America_Mexico_City-jmap": [],
+    "tz-America_Mexico_City-pg": [],
+    "tz-America_Mexico_City-pg-jmap": [],
     "tz-America_Monterrey": [
       "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest#"
     ],
-    "tz-America_Monterrey-jmap": []
+    "tz-America_Monterrey-jmap": [],
+    "tz-America_Monterrey-pg": [],
+    "tz-America_Monterrey-pg-jmap": []
   },
   "reasons": {
     "fetch-body-message-rfc822": "proof 3.4: BODY[n] of a message/rfc822 part returns only the inner body; phase 2",

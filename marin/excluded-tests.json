@@ -140,10 +140,6 @@
       "verdict": "fix",
       "why": "phase 2: IMAP ACL (RFC 4314) commands on PostgreSQL, needed for shared mailboxes (JAMES-3945)"
     },
-    "mpt/impl/imap-mailbox/postgres::PostgresSelectedStateTest#testSearchSaveDate": {
-      "verdict": "fix",
-      "why": "phase 3: SEARCH SAVEDATE returns nothing on PostgreSQL"
-    },
     "server/apps/postgres-app::PostgresWithOpenSearchDisabledTest#searchShouldSucceedOnSearchOverrides": {
       "verdict": "keep",
       "why": "search overrides are an optimisation; the phase 3 index makes them unneeded"
@@ -271,6 +267,14 @@
     "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresMailboxSetMethodTest#oldStateShouldIncludeSetChanges": {
       "verdict": "fix",
       "why": "phase 2: the state a JMAP set returns must be current, or clients resynchronise or miss changes"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresScanningEmailQueryMethodTest#emailQueryFilterByTextShouldIgnoreAttachmentContent": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL full-text index reads the text a person sees"
+    },
+    "server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests::PostgresScanningEmailQueryMethodTest#emailQueryFilterByTextShouldIgnoreMarkupsInHtmlBody": {
+      "verdict": "fix",
+      "why": "phase 3: the PostgreSQL full-text index reads the text a person sees"
     },
     "server/protocols/protocols-imap4::IMAPServerSearchTest#shouldAcceptSeveralFileLiteral": {
       "verdict": "fix",

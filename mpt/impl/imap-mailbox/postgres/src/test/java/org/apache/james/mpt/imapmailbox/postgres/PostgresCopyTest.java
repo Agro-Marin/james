@@ -32,8 +32,4 @@ public class PostgresCopyTest extends Copy {
     protected ImapHostSystem createImapHostSystem() {
         return hostSystemExtension.getHostSystem();
     }
-
-    @Override
-    public void copyCommandShouldRespectTheRFC() {
-    }
 }

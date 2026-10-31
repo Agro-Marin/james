@@ -40,6 +40,11 @@ TZ_ZONES=(America/Mexico_City America/Monterrey)
 TZ_MODULES=(mailbox/store mailbox/memory mailbox/scanning-search mailbox/lucene)
 TZ_JMAP=server/protocols/jmap-rfc-8621-integration-tests/memory-jmap-rfc-8621-integration-tests
 TZ_JMAP_TESTS='MemoryEmailQueryMethodTest,MemoryEmailQueryMethodNoViewTest'
+# The deployed search: the scanning search over PostgreSQL. The module's other classes need Docker, and its pom runs
+# only the BasicFeature tag unless jmap.postgres.groups says otherwise.
+PG_JMAP=server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests
+PG_JMAP_TESTS=PostgresScanningEmailQueryMethodTest
+PG_SEARCH_TESTS='PostgresMessageSearchIndexTest,PostgresSearchTest,PostgresUidSearchTest,PostgresUidSearchOnIndexTest'
 
 RUN=$LANE_CACHE/runs/$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$RUN"
@@ -111,18 +116,25 @@ join() { local IFS=,; echo "$*"; }
 for stage in "${STAGES[@]}"; do
     case $stage in
         build)
-            mvn_logged build -T 8 -pl "$(join "${JUNIT_MODULES[@]}" "${PG_MODULES[@]}" server/apps/postgres-app)" -am \
-                install -DskipTests -Dmaven.javadoc.skip=true
+            mvn_logged build -T 8 -pl "$(join "${JUNIT_MODULES[@]}" "${PG_MODULES[@]}" "$PG_JMAP" server/apps/postgres-app)" \
+                -am install -DskipTests -Dmaven.javadoc.skip=true
             ;;
         junit) TZ=UTC tests junit "$(join "${JUNIT_MODULES[@]}")" -T 2 ;;
         pg)
             [[ -n $PG_PORT ]] || start_postgres
             TZ=UTC tests pg "$(join "${PG_MODULES[@]}")" -Djames.postgres.external="127.0.0.1:$PG_PORT"
+            TZ=UTC tests pg-jmap "$PG_JMAP" -Dtest="$PG_JMAP_TESTS" -Djmap.postgres.groups= \
+                -Djames.postgres.external="127.0.0.1:$PG_PORT"
             ;;
         tz)
+            [[ -n $PG_PORT ]] || start_postgres
             for zone in "${TZ_ZONES[@]}"; do
                 TZ=$zone tests "tz-${zone//\//_}" "$(join "${TZ_MODULES[@]}")" -T 2
                 TZ=$zone tests "tz-${zone//\//_}-jmap" "$TZ_JMAP" -Dtest="$TZ_JMAP_TESTS"
+                TZ=$zone tests "tz-${zone//\//_}-pg" "mailbox/postgres,mpt/impl/imap-mailbox/postgres" \
+                    -Dtest="$PG_SEARCH_TESTS" -Djames.postgres.external="127.0.0.1:$PG_PORT"
+                TZ=$zone tests "tz-${zone//\//_}-pg-jmap" "$PG_JMAP" -Dtest="$PG_JMAP_TESTS" -Djmap.postgres.groups= \
+                    -Djames.postgres.external="127.0.0.1:$PG_PORT"
             done
             ;;
         imap)

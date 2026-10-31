@@ -29,6 +29,10 @@
     <name>Apache James :: Server :: JMAP RFC-8621 :: Postgres Integration Testing</name>
     <description>JMAP RFC-8621 integration test for postgres product</description>
 
+    <properties>
+        <jmap.postgres.groups>BasicFeature</jmap.postgres.groups>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>${james.groupId}</groupId>
@@ -122,7 +126,7 @@
                         -Xms512m -Xmx2048m</argLine>
                     <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
                     <reuseForks>true</reuseForks>
-                    <groups combine.self="override">BasicFeature</groups>
+                    <groups combine.self="override">${jmap.postgres.groups}</groups>
                     <excludedGroups>unstable</excludedGroups>
                     <properties>
                         <includeTags>junit5</includeTags>
