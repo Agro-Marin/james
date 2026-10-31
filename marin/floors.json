@@ -40,7 +40,7 @@
       },
       "mailbox/store": {
         "skipped": 0,
-        "tests": 480
+        "tests": 491
       },
       "mailet/base": {
         "skipped": 0,
@@ -132,7 +132,7 @@
       },
       "mailbox/store": {
         "skipped": 0,
-        "tests": 480
+        "tests": 491
       }
     },
     "tz-America_Mexico_City-jmap": {
@@ -156,7 +156,7 @@
       },
       "mailbox/store": {
         "skipped": 0,
-        "tests": 480
+        "tests": 491
       }
     },
     "tz-America_Monterrey-jmap": {

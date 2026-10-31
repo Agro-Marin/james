@@ -66,12 +66,10 @@ import org.apache.james.mime4j.field.address.LenientAddressParser;
 import org.apache.james.mime4j.field.datetime.parser.DateTimeParser;
 import org.apache.james.mime4j.field.datetime.parser.ParseException;
 import org.apache.james.mime4j.util.MimeUtil;
-import org.apache.james.mime4j.utils.search.MessageMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 
 /**
  * Utility methods to help perform search operations.
@@ -223,13 +221,7 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
     }
 
     private boolean isInMessage(String value, InputStream input, boolean header) throws IOException, MimeException {
-        return MessageMatcher.builder()
-            .searchContents(Lists.<CharSequence>newArrayList(value))
-            .caseInsensitive(true)
-            .includeHeaders(header)
-            .logger(LOGGER)
-            .build()
-            .messageMatches(input);
+        return MessageTextMatcher.contains(input, value, header);
     }
 
     private boolean messageContains(String value, MailboxMessage message) throws IOException, MimeException {
