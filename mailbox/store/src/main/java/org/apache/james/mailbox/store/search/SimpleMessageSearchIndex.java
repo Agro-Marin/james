@@ -20,13 +20,15 @@ package org.apache.james.mailbox.store.search;
 
 import static org.apache.james.mailbox.store.mail.AbstractMessageMapper.UNLIMITED;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import jakarta.inject.Inject;
@@ -47,16 +49,13 @@ import org.apache.james.mailbox.model.SearchQuery;
 import org.apache.james.mailbox.model.SearchQuery.ConjunctionCriterion;
 import org.apache.james.mailbox.model.SearchQuery.Criterion;
 import org.apache.james.mailbox.model.SearchQuery.UidCriterion;
-import org.apache.james.mailbox.model.SearchQuery.UidRange;
 import org.apache.james.mailbox.store.mail.MailboxMapper;
 import org.apache.james.mailbox.store.mail.MailboxMapperFactory;
 import org.apache.james.mailbox.store.mail.MessageMapper;
 import org.apache.james.mailbox.store.mail.MessageMapper.FetchType;
 import org.apache.james.mailbox.store.mail.MessageMapperFactory;
 import org.apache.james.mailbox.store.mail.model.MailboxMessage;
-import org.apache.james.mailbox.store.search.comparator.CombinedComparator;
 import org.apache.james.util.ReactorUtils;
-import org.apache.james.util.streams.Iterators;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -190,32 +189,50 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
             .map(SearchResult::getMessageUid);
     }
 
-    private Set<MailboxMessage> searchResults(MailboxSession session, Mailbox mailbox, SearchQuery query) throws MailboxException {
+    private Collection<MailboxMessage> searchResults(MailboxSession session, Mailbox mailbox, SearchQuery query) throws MailboxException {
         MessageMapper mapper = messageMapperFactory.getMessageMapper(session);
+        MessageSearches matcher = new MessageSearches(Collections.emptyIterator(), query, textExtractor, attachmentContentLoader, session);
+        FetchType criteriaFetchType = getFetchTypeForCriteria(query.getCriteria());
+        FetchType sortFetchType = getFetchTypeForSorts(query.getSorts());
+        List<MessageRange> ranges = rangesToFetch(query);
 
-        final SortedSet<MailboxMessage> hitSet = new TreeSet<>();
-
-        FetchType fetchType = maxFetchType(getFetchTypeForCriteria(query.getCriteria()), getFetchTypeForSorts(query.getSorts()));
-        UidCriterion uidCrit = findConjugatedUidCriterion(query.getCriteria());
-        if (uidCrit != null) {
-            // if there is a conjugated uid range criterion in the query tree we can optimize by
-            // only fetching this uid range
-            UidRange[] ranges = uidCrit.getOperator().getRange();
-            for (UidRange r : ranges) {
-                Iterator<MailboxMessage> it = mapper.findInMailbox(mailbox, MessageRange.range(r.getLowValue(), r.getHighValue()), fetchType, UNLIMITED);
-                while (it.hasNext()) {
-                    hitSet.add(it.next());
+        if (criteriaFetchType != FetchType.FULL) {
+            SortedSet<MailboxMessage> hits = new TreeSet<>();
+            forEachMessage(mapper, mailbox, ranges, maxFetchType(criteriaFetchType, sortFetchType), message -> {
+                if (matcher.matches(message)) {
+                    hits.add(message);
                 }
-            }
-        } else {
-            // we have to fetch all messages; try to limit their memory requirements
-            Iterator<MailboxMessage> messages = mapper.findInMailbox(mailbox, MessageRange.all(), fetchType, UNLIMITED);
-            while (messages.hasNext()) {
-                MailboxMessage m = messages.next();
-                hitSet.add(m);
-            }
+            });
+            return hits;
         }
-        return hitSet;
+        // A whole mailbox's content does not fit in memory: each message is matched as it is read and let go, and the
+        // matches are read again with only what sorting needs
+        SortedSet<MessageUid> hitUids = new TreeSet<>();
+        forEachMessage(mapper, mailbox, ranges, FetchType.FULL, message -> {
+            if (matcher.matches(message)) {
+                hitUids.add(message.getUid());
+            }
+        });
+        List<MailboxMessage> hits = new ArrayList<>();
+        forEachMessage(mapper, mailbox, MessageRange.toRanges(hitUids), sortFetchType, hits::add);
+        return hits;
+    }
+
+    private static List<MessageRange> rangesToFetch(SearchQuery query) {
+        UidCriterion uidCrit = findConjugatedUidCriterion(query.getCriteria());
+        if (uidCrit == null) {
+            return List.of(MessageRange.all());
+        }
+        return Arrays.stream(uidCrit.getOperator().getRange())
+            .map(range -> MessageRange.range(range.getLowValue(), range.getHighValue()))
+            .toList();
+    }
+
+    private static void forEachMessage(MessageMapper mapper, Mailbox mailbox, List<MessageRange> ranges, FetchType fetchType,
+                                       Consumer<MailboxMessage> consumer) throws MailboxException {
+        for (MessageRange range : ranges) {
+            mapper.findInMailbox(mailbox, range, fetchType, UNLIMITED).forEachRemaining(consumer);
+        }
     }
 
     @Override
@@ -233,8 +250,8 @@ public class SimpleMessageSearchIndex implements MessageSearchIndex {
         return mailboxes.concatMap(mailbox -> Mono.fromCallable(() -> getSearchResultStream(session, query, mailbox))
                 .flatMapMany(Flux::fromStream)
                 .subscribeOn(ReactorUtils.BLOCKING_CALL_WRAPPER))
-            .collectSortedList(CombinedComparator.create(query.getSorts()))
-            .flatMapMany(list -> Iterators.toFlux(new MessageSearches(list.iterator(), query, textExtractor, attachmentContentLoader, session).iterator()))
+            .collectList()
+            .flatMapMany(hits -> Flux.fromStream(MessageSearches.order(hits, query)))
             .subscribeOn(ReactorUtils.BLOCKING_CALL_WRAPPER);
     }
 

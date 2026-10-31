@@ -24,8 +24,10 @@ import static org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefiniti
 import static org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition.MessageTable.BODY_BLOB_ID;
 import static org.apache.james.mailbox.postgres.mail.PostgresMessageDataDefinition.MessageTable.HEADER_CONTENT;
 
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.james.blob.api.BlobId;
@@ -66,13 +68,28 @@ public class PostgresMessageRetriever {
         @Override
         public Flux<Pair<SimpleMailboxMessage.Builder, Record>> doRetrieve(Flux<Pair<SimpleMailboxMessage.Builder, Record>> chain) {
             return chain.collectList()  // convert to list to avoid hanging the database connection with Jooq
-                .flatMapMany(list -> Flux.fromIterable(list)
+                .flatMapMany(list -> drain(list)
                     .flatMapSequential(pair -> Mono.fromCallable(() -> toMap(pair.getRight().get(ATTACHMENT_METADATA)))
                         .flatMap(this::getAttachments)
                         .map(messageAttachmentMetadata -> {
                             pair.getLeft().addAttachments(messageAttachmentMetadata);
                             return pair;
                         }).switchIfEmpty(Mono.just(pair))));
+        }
+
+        // The list must not keep a row once it is handed on: the content retriever then sets the message's content on
+        // the row's builder, and a list holding every row would hold every message of the fetch in memory at once
+        private static <T> Flux<T> drain(List<T> list) {
+            Queue<T> queue = new ArrayDeque<>(list);
+            list.clear();
+            return Flux.generate(sink -> {
+                T next = queue.poll();
+                if (next == null) {
+                    sink.complete();
+                } else {
+                    sink.next(next);
+                }
+            });
         }
 
         private Map<AttachmentId, MessageRepresentation.AttachmentRepresentation> toMap(AttachmentsDTO attachmentRepresentations) {

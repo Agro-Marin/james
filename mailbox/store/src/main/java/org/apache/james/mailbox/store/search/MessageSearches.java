@@ -98,26 +98,32 @@ public class MessageSearches implements Iterable<SimpleMessageSearchIndex.Search
     @Override
     public Iterator<SimpleMessageSearchIndex.SearchResult> iterator() {
         ImmutableList.Builder<MailboxMessage> builder = ImmutableList.builder();
-        while (messages.hasNext()) {
-            MailboxMessage m = messages.next();
-            try {
-                if (isMatch(m)) {
-                    builder.add(m);
-                }
-            } catch (MailboxException e) {
-                LOGGER.error("Unable to search message {}", m.getUid(), e);
+        messages.forEachRemaining(message -> {
+            if (matches(message)) {
+                builder.add(message);
             }
+        });
+        return order(builder.build(), query).iterator();
+    }
+
+    public boolean matches(MailboxMessage message) {
+        try {
+            return isMatch(message);
+        } catch (MailboxException e) {
+            LOGGER.error("Unable to search message {}", message.getUid(), e);
+            return false;
         }
+    }
+
+    public static Stream<SimpleMessageSearchIndex.SearchResult> order(Collection<MailboxMessage> hits, SearchQuery query) {
         Set<ThreadId> seenThreads = new HashSet<>();
-        return builder.build()
-            .stream()
+        return hits.stream()
             .sorted(CombinedComparator.create(query.getSorts()))
             .filter(mailboxMessage -> !query.shouldCollapseThreads() || seenThreads.add(mailboxMessage.getThreadId()))
             .map(mailboxMessage -> new SimpleMessageSearchIndex.SearchResult(
                 Optional.of(mailboxMessage.getMessageId()),
                 mailboxMessage.getMailboxId(),
-                mailboxMessage.getUid()))
-            .iterator();
+                mailboxMessage.getUid()));
     }
 
     /**
