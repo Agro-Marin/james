@@ -6,9 +6,15 @@ the edge of Odoo's mail:
 - `odoo.properties`: where James reads the addresses Odoo answers. Its presence installs `OdooModule`.
 - `smtpserver.xml`: `OdooValidRcptHandler` in place of `ValidRcptHandler`, so RCPT accepts an Odoo address, refuses
   an address neither James nor Odoo answers, and defers one both answer (a configuration error, logged as an error).
+  On 587, Odoo's outgoing mail server signs in as `odoo@agromarin.mx` (`ConfigurationAuthHook`), which may send as
+  any address; people sign in with their own passwords (`UsersRepositoryAuthHook`, needed once any AuthHook is
+  configured).
 - `mailetcontainer.xml`: in `transport`, mail waits while Odoo's addresses were never read (`OdooAddressesUnknown`),
   and an Odoo address goes to `odoo-deliver` (`RecipientIsOdoo`), where `OdooInbound` posts it to Odoo's
   `/mail/inbound/<server id>`. A deferral is retried every 5 minutes for a day, then bounced.
+  In `relay`, mail whose envelope sender is in a James domain (people's, and Odoo's `bounce@`) is DKIM-signed with
+  `conf/dkim-james1.pem` (PKCS#8 PEM; DNS: `james1._domainkey.<domain>` TXT `v=DKIM1; k=rsa; p=<public key>`), then
+  handed to SES's SMTP endpoint, retried for about 30 hours.
 
 The OdooInbound token is the one Odoo's local fetchmail server issues ("Issue Inbound Token"), in
 `conf/odoo-inbound.token`, readable by James only. `marin/odoo-e2e/run.sh` runs this configuration against a real Odoo.

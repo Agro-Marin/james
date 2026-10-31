@@ -12,16 +12,23 @@ import secrets
 import shutil
 import signal
 import smtplib
+import socketserver
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from email.message import EmailMessage
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lane"))
+sys.path.insert(0, os.environ["DKIMPY"])
+import dkim  # noqa: E402
 from james import edit, free_port, wait_until_up, webadmin  # noqa: E402
 
 PG_BINDIR = Path(os.environ.get("PG_BINDIR", "/usr/lib/postgresql/18/bin"))
@@ -29,6 +36,9 @@ DOMAIN = "agromarin.test"
 MARIA = f"maria.orozco@{DOMAIN}"
 MARIA_PASSWORD = "e2e-pass-1"
 READER = "james_odoo_reader"
+ODOO_ACCOUNT = "odoo@agromarin.mx"
+ODOO_ACCOUNT_PASSWORD = secrets.token_urlsafe(18)
+SELECTOR = "james1"
 REFRESH = 30
 RUN_ID = str(int(time.time()))
 
@@ -47,6 +57,52 @@ def wait(predicate, seconds):
             return True
         time.sleep(1)
     return False
+
+
+class Gateway(socketserver.ThreadingTCPServer):
+    """The SMTP relay James hands outbound mail to, standing in for SES: it accepts everything and keeps it."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self):
+        self.received = []
+        super().__init__(("127.0.0.1", 0), GatewaySession)
+        self.port = self.server_address[1]
+        threading.Thread(target=self.serve_forever, daemon=True).start()
+
+
+class GatewaySession(socketserver.StreamRequestHandler):
+    def reply(self, line):
+        self.wfile.write(line.encode() + b"\r\n")
+
+    def handle(self):
+        self.reply("220 gateway.test ESMTP")
+        sender, recipients = None, []
+        while line := self.rfile.readline():
+            command = line.decode(errors="replace").strip()
+            verb = command[:4].upper()
+            if verb in ("EHLO", "HELO"):
+                self.reply("250-gateway.test")
+                self.reply("250 8BITMIME")
+            elif verb == "MAIL":
+                sender, recipients = command.split(":", 1)[1].strip().split()[0].strip("<>"), []
+                self.reply("250 OK")
+            elif verb == "RCPT":
+                recipients.append(command.split(":", 1)[1].strip().split()[0].strip("<>"))
+                self.reply("250 OK")
+            elif verb == "DATA":
+                self.reply("354 go ahead")
+                data = bytearray()
+                while (chunk := self.rfile.readline()) not in (b".\r\n", b""):
+                    data += chunk[1:] if chunk.startswith(b"..") else chunk
+                self.server.received.append({"sender": sender, "recipients": recipients, "data": bytes(data)})
+                self.reply("250 queued")
+            elif verb == "QUIT":
+                self.reply("221 bye")
+                return
+            else:
+                self.reply("250 OK")
 
 
 class Cluster:
@@ -142,7 +198,7 @@ class Odoo:
 
 
 class James:
-    def __init__(self, run, repo, cluster, odoo, server_id, token):
+    def __init__(self, run, repo, cluster, odoo, server_id, token, gateway, dkim_key):
         self.home = run / "james"
         self.home.mkdir()
         app = repo / "server" / "apps" / "postgres-app"
@@ -159,6 +215,8 @@ class James:
         token_file.write_text(token + "\n")
         token_file.chmod(0o600)
         self.token_file = token_file
+        (conf / "dkim-james1.pem").write_bytes(dkim_key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
         edit(conf / "postgres.properties",
              (r"database\.name=james", "database.name=james_e2e"),
              (r"database\.host=postgres", "database.host=127.0.0.1"),
@@ -175,6 +233,8 @@ class James:
                       text)
         text = text.replace("<authorizedAddresses>127.0.0.0/8</authorizedAddresses>",
                             "<authorizedAddresses>127.0.0.2/32</authorizedAddresses>")
+        text = text.replace("<username>odoo@agromarin.mx</username>", f"<username>{ODOO_ACCOUNT}</username>")
+        text = text.replace("<password>change-me</password>", f"<password>{ODOO_ACCOUNT_PASSWORD}</password>")
         smtp.write_text(text)
         edit(conf / "imapserver.xml",
              (r"<bind>0\.0\.0\.0:143</bind>", f"<bind>127.0.0.1:{self.ports['imap']}</bind>"),
@@ -190,7 +250,15 @@ class James:
               f"<url>http://127.0.0.1:{odoo.port}/mail/inbound/{server_id}</url>"),
              (r"<tokenFile>conf/odoo-inbound\.token</tokenFile>", f"<tokenFile>{token_file}</tokenFile>"),
              (r"<maxAttempts>288</maxAttempts>", "<maxAttempts>10</maxAttempts>"),
-             (r"<delay>5m</delay>", "<delay>5s</delay>"))
+             (r"<delay>5m</delay>", "<delay>5s</delay>"),
+             (r"<gateway>email-smtp\.us-east-2\.amazonaws\.com</gateway>", "<gateway>127.0.0.1</gateway>"),
+             (r"<gatewayPort>587</gatewayPort>", f"<gatewayPort>{gateway.port}</gatewayPort>"),
+             (r"\s*<gatewayUsername>change-me</gatewayUsername>", ""),
+             (r"\s*<gatewayPassword>change-me</gatewayPassword>", ""),
+             (r"<startTLS>true</startTLS>", "<startTLS>false</startTLS>"),
+             (r"<verifyServerIdentity>true</verifyServerIdentity>", "<verifyServerIdentity>false</verifyServerIdentity>"),
+             (r"<delayTime>[^<]*</delayTime>", "<delayTime>5 * 5 seconds</delayTime>"),
+             (r"<maxRetries>16</maxRetries>", "<maxRetries>5</maxRetries>"))
         logs = self.home / "logs"
         logs.mkdir()
         edit(conf / "logback.xml",
@@ -248,11 +316,23 @@ def message(message_id, to, subject, sender="Zed Supplier <zed@supplier.test>", 
 
 
 class Suite:
-    def __init__(self, cluster, odoo, james, ids):
+    def __init__(self, cluster, odoo, james, ids, gateway, dkim_key):
         self.cluster = cluster
         self.odoo = odoo
         self.james = james
         self.ids = ids
+        self.gateway = gateway
+        der = dkim_key.public_key().public_bytes(serialization.Encoding.DER,
+                                                 serialization.PublicFormat.SubjectPublicKeyInfo)
+        self.dkim_record = b"v=DKIM1; k=rsa; p=" + base64.b64encode(der)
+
+    def dkim_valid(self, data):
+        def txt(name, timeout=5):
+            return self.dkim_record if name == f"{SELECTOR}._domainkey.{DOMAIN}.".encode() else None
+        return dkim.verify(data, dnsfunc=txt)
+
+    def relayed(self, subject):
+        return next((mail for mail in self.gateway.received if subject.encode() in mail["data"]), None)
 
     def send(self, mail, rcpts, sender="zed@supplier.test", login=None):
         port = self.james.ports["submission" if login else "smtp"]
@@ -393,19 +473,55 @@ class Suite:
             self.odoo.sql(f"UPDATE mail_alias SET alias_name = 'ventas', alias_full_name = 'ventas@{DOMAIN}' WHERE alias_name = 'maria.orozco'")
         check("T9 the mailbox accepts again once Odoo drops it", wait(lambda: self.rcpt(MARIA)[0] == 250, 70))
 
+    def t11_odoo_sends(self):
+        self.odoo.shell("outgoing", json.dumps({"host": "127.0.0.1", "port": self.james.ports["submission"],
+                                                 "user": ODOO_ACCOUNT, "password": ODOO_ACCOUNT_PASSWORD}))
+        subject = f"Orden de compra T11 {RUN_ID}"
+        sent = self.odoo.shell("notify", subject)
+        check("T11 Odoo hands its notification to James submission", sent["queued"] >= 1 and not sent["unsent"], json.dumps(sent))
+        check("T11 James relays it to the gateway", wait(lambda: self.relayed(subject) is not None, 40))
+        mail = self.relayed(subject) or {"sender": None, "recipients": [], "data": b""}
+        check("T11 to Zed, from Odoo's bounce address", mail["recipients"] == ["zed@supplier.test"]
+              and mail["sender"] == f"bounce@{DOMAIN}", f"{mail['sender']} -> {mail['recipients']}")
+        check("T11 it is DKIM-signed for agromarin, and dkimpy verifies the signature",
+              b"DKIM-Signature:" in mail["data"] and f"d={DOMAIN}".encode() in mail["data"]
+              and self.dkim_valid(mail["data"]))
+        check("T11 its From is Odoo's notification address, in the signed domain",
+              f"<notifications@{DOMAIN}>".encode() in mail["data"].split(b"\r\n\r\n", 1)[0])
+
+    def t12_person_sends(self):
+        subject = f"Respuesta T12 {RUN_ID}"
+        self.send(message(f"t12-{RUN_ID}@{DOMAIN}", "zed@supplier.test", subject, sender=f"Maria Orozco <{MARIA}>"),
+                  ["zed@supplier.test"], sender=MARIA, login=(MARIA, MARIA_PASSWORD))
+        check("T12 Maria's own mail is relayed DKIM-signed too",
+              wait(lambda: self.relayed(subject) is not None, 40) and self.dkim_valid(self.relayed(subject)["data"]))
+        tampered = self.relayed(subject)["data"].replace(subject.encode(), b"Altered " + subject.encode())
+        check("T12 an altered copy fails dkimpy's verification", not self.dkim_valid(tampered))
+
+    def t13_odoo_account(self):
+        with smtplib.SMTP("127.0.0.1", self.james.ports["submission"], timeout=30) as smtp:
+            smtp.starttls(context=ssl._create_unverified_context())
+            try:
+                smtp.login(ODOO_ACCOUNT, "wrong")
+                refused = False
+            except smtplib.SMTPAuthenticationError:
+                refused = True
+        check("T13 the Odoo account with a wrong password is refused", refused)
+
     def t10_health(self):
         check("T10 James's Odoo addresses health check is healthy", self.james.health() == "healthy",
               self.james.health())
 
 
 TESTS = ["t1_odoo_address", "t2_mailbox", "t3_unknown", "t4_token", "t5_new_alias", "t6_archived_alias",
-         "t7_archived_meanwhile", "t8_reply", "t9_both", "t10_health"]
+         "t7_archived_meanwhile", "t8_reply", "t9_both", "t11_odoo_sends", "t12_person_sends", "t13_odoo_account",
+         "t10_health"]
 
 
 def main(run, repo, checkout, python, names):
     run.mkdir(parents=True)
     cluster = Cluster(run)
-    odoo = james = None
+    odoo = james = gateway = None
     try:
         odoo = Odoo(run, checkout, python, cluster)
         print("e2e: installing mail_inbox", flush=True)
@@ -415,13 +531,17 @@ def main(run, repo, checkout, python, names):
                     f"GRANT SELECT ON mail_gateway_recipient TO {READER}")
         odoo.start()
         print("e2e: starting James", flush=True)
-        james = James(run, repo, cluster, odoo, ids["server_id"], ids["token"])
-        suite = Suite(cluster, odoo, james, ids)
+        gateway = Gateway()
+        dkim_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        james = James(run, repo, cluster, odoo, ids["server_id"], ids["token"], gateway, dkim_key)
+        suite = Suite(cluster, odoo, james, ids, gateway, dkim_key)
         for name in names or TESTS:
             getattr(suite, next(test for test in TESTS if test == name or test.startswith(name + "_")))()
         errors = [line for line in james.log().splitlines() if " ERROR " in line and "is both an Odoo address" not in line]
         check("James logged no other error", not errors, "; ".join(errors[:3]))
     finally:
+        for number, mail in enumerate(gateway.received if gateway else []):
+            (run / f"gateway-{number}.eml").write_bytes(mail["data"])
         if james:
             james.stop()
         if odoo:

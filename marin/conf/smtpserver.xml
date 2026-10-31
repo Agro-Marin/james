@@ -152,6 +152,21 @@
         <smtpGreeting>Apache JAMES awesome SMTP Server</smtpGreeting>
         <handlerchain>
             <handler class="mx.agromarin.james.odoo.OdooValidRcptHandler"/>
+            <!-- Odoo's outgoing mail server signs in as this account, and sends as any of its users and its bounce
+                 address. Its password is the ir.mail_server's; keep a second one here while rotating it. -->
+            <handler class="org.apache.james.smtpserver.ConfigurationAuthHook">
+                <accounts>
+                    <account>
+                        <username>odoo@agromarin.mx</username>
+                        <passwords>
+                            <password>change-me</password>
+                        </passwords>
+                        <allowUseOtherIdentity>true</allowUseOtherIdentity>
+                    </account>
+                </accounts>
+            </handler>
+            <!-- A configured AuthHook makes PLAIN and LOGIN ask the hooks alone, so people's passwords need theirs. -->
+            <handler class="org.apache.james.smtpserver.UsersRepositoryAuthHook"/>
             <handler class="org.apache.james.smtpserver.CoreCmdHandlerLoader"/>
         </handlerchain>
     </smtpserver>

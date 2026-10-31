@@ -102,6 +102,14 @@ imaptest() {
     echo "$src"
 }
 
+dkimpy() {
+    local src=$LANE_CACHE/dkimpy-1.1.8
+    if [[ ! -f $src/dkim/__init__.py ]]; then
+        tar -xzf "$(fetch "$DKIMPY_URL" sha256 "$DKIMPY_SHA256")" -C "$LANE_CACHE"
+    fi
+    echo "$src"
+}
+
 postgres_bindir() {
     local bindir=${PG_BINDIR:-/usr/lib/postgresql/$PG_MAJOR/bin}
     if [[ ! -x $bindir/initdb ]]; then

@@ -7,7 +7,8 @@ set -euo pipefail
 MARIN=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 REPO=$(git -C "$MARIN" rev-parse --show-toplevel)
 . "$MARIN/lane/tools.sh"
-export PG_BINDIR
+DKIMPY=$(dkimpy)
+export PG_BINDIR DKIMPY
 [[ -f $REPO/server/apps/postgres-app/target/james-server-postgres-app.jar ]] || {
     echo "run.sh: package server/apps/postgres-app first" >&2
     exit 2

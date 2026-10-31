@@ -104,10 +104,22 @@
         </processor>
 
         <processor state="relay" enableJmx="true">
+            <mailet match="SenderHostIsLocal" class="org.apache.james.jdkim.mailets.ConvertTo7Bit"/>
+            <mailet match="SenderHostIsLocal" class="org.apache.james.jdkim.mailets.DKIMSign">
+                <signatureTemplate>v=1; s=james1; d=%MAIL_FROM; h=from:to:cc:reply-to:subject:date:message-id:in-reply-to:references:mime-version:content-type:content-transfer-encoding; a=rsa-sha256; c=relaxed/relaxed; bh=; b=;</signatureTemplate>
+                <defaultDomain>agromarin.mx</defaultDomain>
+                <privateKeyFilepath>file://conf/dkim-james1.pem</privateKeyFilepath>
+            </mailet>
             <mailet match="All" class="RemoteDelivery">
                 <outgoing>outgoing</outgoing>
-                <delayTime>5000, 100000, 500000</delayTime>
-                <maxRetries>3</maxRetries>
+                <gateway>email-smtp.us-east-2.amazonaws.com</gateway>
+                <gatewayPort>587</gatewayPort>
+                <gatewayUsername>change-me</gatewayUsername>
+                <gatewayPassword>change-me</gatewayPassword>
+                <startTLS>true</startTLS>
+                <verifyServerIdentity>true</verifyServerIdentity>
+                <delayTime>5 * 5 minutes, 5 * 1 hour, 6 * 4 hours</delayTime>
+                <maxRetries>16</maxRetries>
                 <maxDnsProblemRetries>0</maxDnsProblemRetries>
                 <deliveryThreads>10</deliveryThreads>
                 <sendpartial>true</sendpartial>
