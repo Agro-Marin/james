@@ -77,6 +77,47 @@ class MessageTextMatcherTest {
     }
 
     @Test
+    void shouldNotSearchANonTextualPart() throws Exception {
+        String message = "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            + "--b\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+            + "--b\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+            + "bmVlZGxl\r\n"
+            + "--b--\r\n";
+
+        assertThat(bodyContains(message, "needle")).isFalse();
+    }
+
+    @Test
+    void shouldSearchATextualAttachment() throws Exception {
+        String message = "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            + "--b\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+            + "--b\r\nContent-Type: text/csv\r\nContent-Disposition: attachment; filename=a.csv\r\n\r\n"
+            + "needle,1\r\n"
+            + "--b--\r\n";
+
+        assertThat(bodyContains(message, "needle")).isTrue();
+    }
+
+    @Test
+    void shouldSearchABodyWithoutContentType() throws Exception {
+        assertThat(bodyContains("Subject: s\r\n\r\nneedle\r\n", "needle")).isTrue();
+    }
+
+    @Test
+    void textShouldBeTheSearchedText() throws Exception {
+        String message = "Subject: =?UTF-8?Q?caf=C3=A9?=\r\nContent-Type: multipart/mixed; boundary=b\r\n\r\n"
+            + "--b\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+            + "dGVzdG1haWw=\r\n"
+            + "--b\r\nContent-Type: application/octet-stream\r\n\r\nbinary\r\n"
+            + "--b--\r\n";
+
+        MessageTextMatcher.Text text = MessageTextMatcher.text(new ByteArrayInputStream(message.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(text.bodies()).containsExactly("testmail");
+        assertThat(text.fieldBodies()).contains("=?UTF-8?Q?caf=C3=A9?=", "multipart/mixed; boundary=b", "text/plain; charset=UTF-8");
+    }
+
+    @Test
     void shouldNotFindAbsentText() throws Exception {
         assertThat(bodyContains("Subject: s\r\n\r\ntestmai", "testmail")).isFalse();
     }
