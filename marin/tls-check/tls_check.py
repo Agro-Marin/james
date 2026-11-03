@@ -78,7 +78,9 @@ def start(run_dir, repo):
     site.mkdir()
     logs.mkdir()
     run("openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048", "-out", site / "dkim-james1.pem")
-    run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", site / "privkey.pem", "-out",
+    # An EC P-256 key, as certbot issues by default.
+    run("openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-keyout",
+        site / "privkey.pem", "-out",
         site / "fullchain.pem", "-days", "2", "-subj", "/CN=mail.agromarin.test")
     environment = {
         "JAMES_PG_PORT": str(pg_port), "JAMES_PG_DATABASE": "james_tls", "JAMES_PG_PASSWORD": "secret1",
