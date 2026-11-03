@@ -105,6 +105,89 @@ class GatewaySession(socketserver.StreamRequestHandler):
                 self.reply("250 OK")
 
 
+class Dns(socketserver.ThreadingUDPServer):
+    """A resolver for Rspamd that knows only the TXT records the suite gives it, and answers NXDOMAIN to the rest."""
+
+    daemon_threads = True
+
+    def __init__(self, records):
+        self.records = {name.lower().rstrip("."): value for name, value in records.items()}
+        super().__init__(("127.0.0.1", 0), DnsQuery)
+        self.port = self.server_address[1]
+        threading.Thread(target=self.serve_forever, daemon=True).start()
+
+
+class DnsQuery(socketserver.BaseRequestHandler):
+    def handle(self):
+        data, sock = self.request
+        labels, offset = [], 12
+        while data[offset]:
+            labels.append(data[offset + 1:offset + 1 + data[offset]].decode(errors="replace"))
+            offset += 1 + data[offset]
+        qtype = int.from_bytes(data[offset + 1:offset + 3], "big")
+        question = data[12:offset + 5]
+        name = ".".join(labels).lower()
+        value = self.server.records.get(name) if qtype == 16 else None
+        flags = 0x8180 if value is not None else 0x8183
+        header = data[:2] + flags.to_bytes(2, "big") + b"\x00\x01" + (b"\x00\x01" if value else b"\x00\x00") + b"\x00\x00\x00\x00"
+        answer = b""
+        if value:
+            text = value.encode()
+            rdata = bytes([len(text)]) + text
+            answer = b"\xc0\x0c\x00\x10\x00\x01\x00\x00\x00\x3c" + len(rdata).to_bytes(2, "big") + rdata
+        sock.sendto(header + question + answer, self.client_address)
+
+
+class Rspamd:
+    def __init__(self, run, root, dns):
+        self.dir = run / "rspamd"
+        local = self.dir / "local"
+        (local / "local.d").mkdir(parents=True)
+        for name in ("run", "db", "log"):
+            (self.dir / name).mkdir()
+        self.port = free_port()
+        files = {
+            "worker-normal.inc": f'bind_socket = "127.0.0.1:{self.port}";\ncount = 1;\n',
+            "worker-controller.inc": f'bind_socket = "127.0.0.1:{free_port()}";\n',
+            "worker-proxy.inc": "enabled = false;\n",
+            "logging.inc": 'type = "file";\nfilename = "$LOGDIR/rspamd.log";\nlevel = "info";\n',
+            "options.inc": f'dns {{ nameserver = ["127.0.0.1:{dns.port}"]; timeout = 1s; retransmits = 1; }}\n'
+                           "local_addrs = [];\n",
+            # The suite's mail comes from loopback, which Rspamd takes for local and would not check.
+            "spf.conf": "check_local = true;\n",
+            "dmarc.conf": 'check_local = true;\nactions { reject = "reject"; quarantine = "add header"; }\n',
+        }
+        for name, text in files.items():
+            (local / "local.d" / name).write_text(text)
+        etc, share = root / "etc" / "rspamd", root / "usr" / "share" / "rspamd"
+        variables = {"CONFDIR": etc, "LOCAL_CONFDIR": local, "RUNDIR": self.dir / "run", "DBDIR": self.dir / "db",
+                     "LOGDIR": self.dir / "log", "PLUGINSDIR": share / "plugins", "SHAREDIR": share,
+                     "LUALIBDIR": share / "lualib", "RULESDIR": share / "rules", "WWWDIR": share / "www"}
+        env = {**os.environ, "LD_LIBRARY_PATH": f"{root}/usr/lib/rspamd:{root}/usr/lib/x86_64-linux-gnu"}
+        out = (self.dir / "rspamd.out").open("w")
+        self.process = subprocess.Popen(
+            [str(root / "usr" / "bin" / "rspamd"), "-f", "-c", str(etc / "rspamd.conf"),
+             *[f"--var={key}={value}" for key, value in variables.items()]],
+            stdout=out, stderr=subprocess.STDOUT, env=env, start_new_session=True)
+
+        def up():
+            if self.process.poll() is not None:
+                raise SystemExit(f"e2e.py: Rspamd exited with {self.process.returncode}; see {self.dir}/rspamd.out")
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/ping", timeout=2) as response:
+                    return response.status == 200
+            except (urllib.error.URLError, ConnectionError, TimeoutError):
+                return False
+
+        if not wait(up, 60):
+            raise SystemExit(f"e2e.py: Rspamd did not answer; see {self.dir}")
+
+    def stop(self):
+        if self.process.poll() is None:
+            os.killpg(self.process.pid, signal.SIGTERM)
+            self.process.wait(30)
+
+
 class Cluster:
     def __init__(self, run):
         self.dir = run / "pg"
@@ -198,7 +281,7 @@ class Odoo:
 
 
 class James:
-    def __init__(self, run, repo, cluster, odoo, server_id, token, gateway, dkim_key):
+    def __init__(self, run, repo, cluster, odoo, server_id, token, gateway, dkim_key, rspamd):
         self.home = run / "james"
         self.home.mkdir()
         app = repo / "server" / "apps" / "postgres-app"
@@ -242,6 +325,7 @@ class James:
         with (conf / "jmap.properties").open("a") as jmap:
             jmap.write(f"\njmap.port={self.ports['jmap']}\nurl.prefix=http://127.0.0.1:{self.ports['jmap']}\n")
         edit(conf / "jmx.properties", (r"(?m)^jmx\.enabled=true$", "jmx.enabled=false"))
+        edit(conf / "rspamd.properties", (r"(?m)^rspamdUrl=.*$", f"rspamdUrl=http://127.0.0.1:{rspamd.port}"))
         edit(conf / "webadmin.properties",
              (r"(?m)^port=8000$", f"port={self.ports['webadmin']}"),
              (r"(?m)^password\.generate=true$", f"password={self.password}"))
@@ -542,6 +626,33 @@ class Suite:
         check("T16 a mailbox closed in Odoo is refused at RCPT within a minute", refused and delay <= 60,
               f"{delay:.0f} s")
 
+    def refused_at_data(self, mail, rcpts, sender):
+        try:
+            self.send(mail, rcpts, sender=sender)
+            return None
+        except smtplib.SMTPDataError as error:
+            return error.smtp_code, error.smtp_error.decode(errors="replace")
+
+    def t17_gtube(self):
+        mid = f"t17-{RUN_ID}@supplier.test"
+        mail = message(mid, f"ventas@{DOMAIN}", f"Oferta T17 {RUN_ID}")
+        mail.set_content("XJS*C4JDBQADN1.NSBN3*2IDNEN*GTUBE-STANDARD-ANTI-UBE-TEST-EMAIL*C.34X\n")
+        refusal = self.refused_at_data(mail, [f"ventas@{DOMAIN}"], "zed@supplier.test")
+        check("T17 GTUBE is refused at the end of DATA, while its sender is connected",
+              refusal is not None and refusal[0] == 554 and refusal[1].startswith("5.7.1"), str(refusal))
+        time.sleep(3)
+        check("T17 and never reaches Odoo", self.odoo_messages(mid) == "0")
+
+    def t18_forged_dmarc(self):
+        mid = f"t18-{RUN_ID}@bank.test"
+        refusal = self.refused_at_data(
+            message(mid, MARIA, f"Su cuenta T18 {RUN_ID}", sender="Banco <avisos@bank.test>"), [MARIA],
+            "avisos@bank.test")
+        check("T18 a sender forging a domain whose DMARC policy is reject is refused at DATA",
+              refusal is not None and refusal[0] == 554, str(refusal))
+        time.sleep(3)
+        check("T18 and it is not in Maria's inbox", not self.imap("SUBJECT", f'"Su cuenta T18 {RUN_ID}"'))
+
     def t10_health(self):
         check("T10 James's Odoo directory health check is healthy", self.james.health() == "healthy",
               self.james.health())
@@ -549,13 +660,14 @@ class Suite:
 
 TESTS = ["t1_odoo_address", "t2_mailbox", "t3_unknown", "t4_token", "t5_new_alias", "t6_archived_alias",
          "t7_archived_meanwhile", "t8_reply", "t9_both", "t11_odoo_sends", "t12_person_sends", "t13_odoo_account",
-         "t10_health", "t14_odoo_password", "t15_revoked_key", "t16_closed_mailbox"]
+         "t10_health", "t17_gtube", "t18_forged_dmarc", "t14_odoo_password", "t15_revoked_key",
+         "t16_closed_mailbox"]
 
 
 def main(run, repo, checkout, python, names):
     run.mkdir(parents=True)
     cluster = Cluster(run)
-    odoo = james = gateway = None
+    odoo = james = gateway = rspamd = None
     try:
         odoo = Odoo(run, checkout, python, cluster)
         print("e2e: installing mail_inbox", flush=True)
@@ -569,7 +681,9 @@ def main(run, repo, checkout, python, names):
         print("e2e: starting James", flush=True)
         gateway = Gateway()
         dkim_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        james = James(run, repo, cluster, odoo, ids["server_id"], ids["token"], gateway, dkim_key)
+        dns = Dns({"_dmarc.bank.test": "v=DMARC1; p=reject", "bank.test": "v=spf1 -all"})
+        rspamd = Rspamd(run, Path(os.environ["RSPAMD_ROOT"]), dns)
+        james = James(run, repo, cluster, odoo, ids["server_id"], ids["token"], gateway, dkim_key, rspamd)
         suite = Suite(cluster, odoo, james, ids, gateway, dkim_key)
         for name in names or TESTS:
             getattr(suite, next(test for test in TESTS if test == name or test.startswith(name + "_")))()
@@ -580,6 +694,8 @@ def main(run, repo, checkout, python, names):
             (run / f"gateway-{number}.eml").write_bytes(mail["data"])
         if james:
             james.stop()
+        if rspamd:
+            rspamd.stop()
         if odoo:
             odoo.stop()
         cluster.stop()

@@ -127,6 +127,12 @@
         "tests": 139
       }
     },
+    "rspamd": {
+      "third-party/rspamd": {
+        "skipped": 0,
+        "tests": 6
+      }
+    },
     "tz-America_Mexico_City": {
       "mailbox/lucene": {
         "skipped": 0,
@@ -215,6 +221,7 @@
     ],
     "pg": [],
     "pg-jmap": [],
+    "rspamd": [],
     "tz-America_Mexico_City": [
       "mailbox/lucene::org.apache.james.mailbox.lucene.search.LuceneMessageSearchIndexTest#"
     ],

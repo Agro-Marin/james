@@ -57,6 +57,7 @@
         <smtpGreeting>Apache JAMES awesome SMTP Server</smtpGreeting>
         <handlerchain coreHandlersPackage="org.apache.james.smtpserver.NoAuthCmdHandlerLoader">
             <handler class="mx.agromarin.james.odoo.OdooValidRcptHandler"/>
+            <handler class="org.apache.james.rspamd.RspamdSMTPHook"/>
         </handlerchain>
     </smtpserver>
     <smtpserver enabled="true">

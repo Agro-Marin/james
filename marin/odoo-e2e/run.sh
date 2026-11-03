@@ -8,7 +8,8 @@ MARIN=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 REPO=$(git -C "$MARIN" rev-parse --show-toplevel)
 . "$MARIN/lane/tools.sh"
 DKIMPY=$(dkimpy)
-export PG_BINDIR DKIMPY
+RSPAMD_ROOT=$(rspamd_root)
+export PG_BINDIR DKIMPY RSPAMD_ROOT
 [[ -f $REPO/server/apps/postgres-app/target/james-server-postgres-app.jar ]] || {
     echo "run.sh: package server/apps/postgres-app first" >&2
     exit 2

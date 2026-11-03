@@ -44,6 +44,8 @@ TZ_JMAP_TESTS='MemoryEmailQueryMethodTest,MemoryEmailQueryMethodNoViewTest'
 # only the BasicFeature tag unless jmap.postgres.groups says otherwise.
 PG_JMAP=server/protocols/jmap-rfc-8621-integration-tests/postgres-jmap-rfc-8621-integration-tests
 PG_JMAP_TESTS=PostgresScanningEmailQueryMethodTest
+# The Rspamd module's other classes need Docker.
+RSPAMD_TESTS=RspamdSMTPHookTest
 PG_SEARCH_TESTS='PostgresMessageSearchIndexTest,PostgresSearchTest,PostgresUidSearchTest,PostgresUidSearchOnIndexTest'
 
 RUN=$LANE_CACHE/runs/$(date -u +%Y%m%dT%H%M%SZ)
@@ -119,7 +121,10 @@ for stage in "${STAGES[@]}"; do
             mvn_logged build -T 8 -pl "$(join "${JUNIT_MODULES[@]}" "${PG_MODULES[@]}" "$PG_JMAP" server/apps/postgres-app)" \
                 -am install -DskipTests -Dmaven.javadoc.skip=true
             ;;
-        junit) TZ=UTC tests junit "$(join "${JUNIT_MODULES[@]}")" -T 2 ;;
+        junit)
+            TZ=UTC tests junit "$(join "${JUNIT_MODULES[@]}")" -T 2
+            TZ=UTC tests rspamd third-party/rspamd -Dtest="$RSPAMD_TESTS"
+            ;;
         pg)
             [[ -n $PG_PORT ]] || start_postgres
             TZ=UTC tests pg "$(join "${PG_MODULES[@]}")" -Djames.postgres.external="127.0.0.1:$PG_PORT"

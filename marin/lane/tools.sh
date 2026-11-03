@@ -119,6 +119,17 @@ unpacked() {  # name url sha256 -> path of the unpacked package's usr/bin
     echo "$root/usr/bin"
 }
 
+rspamd_root() {  # -> the root Rspamd and its libraries are unpacked in; its binary is usr/bin/rspamd
+    local root=$LANE_CACHE/rspamd-3.8.1 deb
+    if [[ ! -x $root/usr/bin/rspamd ]]; then
+        rm -rf "$root" && mkdir -p "$root"
+        for deb in "${RSPAMD_DEBS[@]}"; do
+            dpkg-deb -x "$(fetch ${deb% *} sha256 ${deb#* })" "$root"
+        done
+    fi
+    echo "$root"
+}
+
 postgres_bindir() {
     local bindir=${PG_BINDIR:-/usr/lib/postgresql/$PG_MAJOR/bin}
     if [[ ! -x $bindir/initdb ]]; then

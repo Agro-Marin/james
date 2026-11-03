@@ -9,6 +9,9 @@ the edge of Odoo's mail:
   On 587, Odoo's outgoing mail server signs in as `odoo@agromarin.mx` (`ConfigurationAuthHook`), which may send as
   any address; people sign in with their own passwords (`UsersRepositoryAuthHook`, needed once any AuthHook is
   configured).
+- `rspamd.properties`: where Rspamd listens. On port 25, `RspamdSMTPHook` asks it about each message at the end of
+  DATA: what it rejects (spam, GTUBE, a sender failing a DMARC reject policy) is refused with 554 5.7.1, what it
+  defers gets 451 4.7.1, and when it cannot answer the message is accepted.
 - `mailetcontainer.xml`: in `transport`, mail waits while Odoo's addresses were never read (`OdooDirectoryUnknown`),
   and an Odoo address goes to `odoo-deliver` (`RecipientIsOdoo`), where `OdooInbound` posts it to Odoo's
   `/mail/inbound/<server id>`. A deferral is retried every 5 minutes for a day, then bounced.

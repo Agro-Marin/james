@@ -101,6 +101,7 @@ import org.apache.james.modules.task.PostgresTaskExecutionDetailsProjectionGuice
 import org.apache.james.modules.vault.DeletedMessageVaultRoutesModule;
 import org.apache.james.modules.webadmin.TasksCleanupRoutesModule;
 import org.apache.james.oidc.redis.OidcTokenCacheModuleChooser;
+import org.apache.james.rspamd.module.RspamdModule;
 import org.apache.james.server.core.filesystem.FileSystemImpl;
 import org.apache.james.utils.PropertiesProvider;
 import org.apache.james.vault.VaultConfiguration;
@@ -212,6 +213,7 @@ public class PostgresJamesServerMain implements JamesServerMain {
             .combineWith(chooseDeletedMessageVaultModules(configuration.getDeletedMessageVaultConfiguration()))
             .combineWith(chooseRLSSupportPostgresMailboxModule(configuration))
             .combineWith(odooConfiguration.<Module>map(any -> new OdooModule()).orElse(Modules.EMPTY_MODULE))
+            .combineWith(chooseRspamdModule(configuration))
             .overrideWith(chooseJmapModules(configuration))
             .overrideWith(chooseTaskManagerModules(configuration))
             .overrideWith(chooseDropListsModule(configuration));
@@ -222,6 +224,19 @@ public class PostgresJamesServerMain implements JamesServerMain {
             return List.of(new PostgresSearchTextModule());
         }
         return List.of();
+    }
+
+    private static Module chooseRspamdModule(PostgresJamesConfiguration configuration) {
+        PropertiesProvider propertiesProvider = new PropertiesProvider(new FileSystemImpl(configuration.directories()),
+            configuration.configurationPath());
+        try {
+            propertiesProvider.getConfiguration("rspamd");
+            return new RspamdModule();
+        } catch (FileNotFoundException e) {
+            return Modules.EMPTY_MODULE;
+        } catch (ConfigurationException e) {
+            throw new IllegalArgumentException("Cannot read rspamd.properties", e);
+        }
     }
 
     private static Optional<OdooConfiguration> odooConfiguration(PostgresJamesConfiguration configuration) {
