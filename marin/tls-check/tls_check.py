@@ -88,7 +88,7 @@ def start(run_dir, repo):
         "JAMES_DKIM_KEY": f"file://{site}/dkim-james1.pem", "JAMES_SES_HOST": "127.0.0.1", "JAMES_SES_USERNAME": "",
         "JAMES_SES_PASSWORD": "", "JAMES_TLS_KEY": f"file://{site}/privkey.pem",
         "JAMES_TLS_CERTIFICATES": f"file://{site}/fullchain.pem", "JAMES_WEBADMIN_PASSWORD": "tls-check",
-        "JAMES_LOG_DIR": str(logs),
+        "JAMES_LOG_DIR": str(logs), "JAMES_DEFAULT_DOMAIN": "agromarin.test",
     }
     with (home / "james.out").open("w") as out:
         process = subprocess.Popen(

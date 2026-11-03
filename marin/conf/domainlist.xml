@@ -23,8 +23,5 @@
 <domainlist>
     <autodetect>false</autodetect>
     <autodetectIP>false</autodetectIP>
-    <domainnames>
-        <domainname>agromarin.mx</domainname>
-    </domainnames>
-    <defaultDomain>agromarin.mx</defaultDomain>
+    <defaultDomain>${env:JAMES_DEFAULT_DOMAIN}</defaultDomain>
 </domainlist>

@@ -14,6 +14,7 @@ them with the app, and agromarin-infra's mail role supplies the environment (`/e
 | `JAMES_TLS_KEY`, `JAMES_TLS_CERTIFICATES` | `file://` URLs of the certificate's key and chain (PEM) |
 | `JAMES_WEBADMIN_PASSWORD` | the WebAdmin password (WebAdmin listens on localhost) |
 | `JAMES_LOG_DIR` | where `james.log` is written |
+| `JAMES_DEFAULT_DOMAIN` | the default domain (postmaster's); the domains James serves are added through WebAdmin |
 
 Laid over `server/apps/postgres-app/sample-configuration` (and `sample-configuration-single`), these files make James
 the edge of Odoo's mail:

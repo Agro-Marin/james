@@ -26,7 +26,7 @@
     <context>
         <!-- When the domain part of the postmaster mailAddress is missing, the default domain is appended.
         You can configure it to (for example) <postmaster>postmaster@myDomain.com</postmaster> -->
-        <postmaster>postmaster@agromarin.mx</postmaster>
+        <postmaster>postmaster</postmaster>
     </context>
 
     <spooler>

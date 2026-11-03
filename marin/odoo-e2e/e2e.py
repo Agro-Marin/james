@@ -322,7 +322,7 @@ class James:
             "JAMES_DKIM_KEY": f"file://{dkim}",
             "JAMES_SES_HOST": "127.0.0.1", "JAMES_SES_USERNAME": "", "JAMES_SES_PASSWORD": "",
             "JAMES_TLS_KEY": f"file://{tls_key}", "JAMES_TLS_CERTIFICATES": f"file://{tls_certificates}",
-            "JAMES_WEBADMIN_PASSWORD": self.password, "JAMES_LOG_DIR": str(logs),
+            "JAMES_WEBADMIN_PASSWORD": self.password, "JAMES_LOG_DIR": str(logs), "JAMES_DEFAULT_DOMAIN": DOMAIN,
         }
         smtp = conf / "smtpserver.xml"
         text = smtp.read_text()
