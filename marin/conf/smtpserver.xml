@@ -26,13 +26,28 @@
         <jmxName>smtpserver-global</jmxName>
         <bind>0.0.0.0:25</bind>
         <connectionBacklog>200</connectionBacklog>
-        <tls socketTLS="false" startTLS="false">
+        <tls socketTLS="false" startTLS="true">
             <!-- To create a new keystore execute:
               keytool -genkey -alias james -keyalg RSA -storetype PKCS12 -keystore /path/to/james/conf/keystore
              -->
             <keystore>file://conf/keystore</keystore>
             <keystoreType>PKCS12</keystoreType>
             <secret>james72laBalle</secret>
+            <supportedProtocols>
+                <protocol>TLSv1.3</protocol>
+                <protocol>TLSv1.2</protocol>
+            </supportedProtocols>
+            <supportedCipherSuites>
+                <cipherSuite>TLS_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_CHACHA20_POLY1305_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256</cipherSuite>
+            </supportedCipherSuites>
             <provider>org.bouncycastle.jce.provider.BouncyCastleProvider</provider>
             <algorithm>SunX509</algorithm>
 
@@ -43,8 +58,8 @@
             <!-- <secret>james72laBalle</secret> -->
         </tls>
         <connectiontimeout>360</connectiontimeout>
-        <connectionLimit>0</connectionLimit>
-        <connectionLimitPerIP>0</connectionLimitPerIP>
+        <connectionLimit>500</connectionLimit>
+        <connectionLimitPerIP>20</connectionLimitPerIP>
         <auth>
             <announce>never</announce>
             <requireSSL>false</requireSSL>
@@ -52,15 +67,18 @@
         </auth>
         <authorizedAddresses>127.0.0.0/8</authorizedAddresses>
         <verifyIdentity>true</verifyIdentity>
-        <maxmessagesize>0</maxmessagesize>
+        <maxmessagesize>40M</maxmessagesize>
         <addressBracketsEnforcement>true</addressBracketsEnforcement>
         <smtpGreeting>Apache JAMES awesome SMTP Server</smtpGreeting>
         <handlerchain coreHandlersPackage="org.apache.james.smtpserver.NoAuthCmdHandlerLoader">
             <handler class="mx.agromarin.james.odoo.OdooValidRcptHandler"/>
+            <handler class="org.apache.james.smtpserver.fastfail.MaxRcptHandler">
+                <maxRcpt>100</maxRcpt>
+            </handler>
             <handler class="org.apache.james.rspamd.RspamdSMTPHook"/>
         </handlerchain>
     </smtpserver>
-    <smtpserver enabled="true">
+    <smtpserver enabled="false">
         <jmxName>smtpserver-TLS</jmxName>
         <bind>0.0.0.0:465</bind>
         <connectionBacklog>200</connectionBacklog>
@@ -71,6 +89,21 @@
             <keystore>file://conf/keystore</keystore>
             <keystoreType>PKCS12</keystoreType>
             <secret>james72laBalle</secret>
+            <supportedProtocols>
+                <protocol>TLSv1.3</protocol>
+                <protocol>TLSv1.2</protocol>
+            </supportedProtocols>
+            <supportedCipherSuites>
+                <cipherSuite>TLS_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_CHACHA20_POLY1305_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256</cipherSuite>
+            </supportedCipherSuites>
             <provider>org.bouncycastle.jce.provider.BouncyCastleProvider</provider>
             <algorithm>SunX509</algorithm>
 
@@ -119,6 +152,21 @@
             <keystore>file://conf/keystore</keystore>
             <keystoreType>PKCS12</keystoreType>
             <secret>james72laBalle</secret>
+            <supportedProtocols>
+                <protocol>TLSv1.3</protocol>
+                <protocol>TLSv1.2</protocol>
+            </supportedProtocols>
+            <supportedCipherSuites>
+                <cipherSuite>TLS_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_CHACHA20_POLY1305_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</cipherSuite>
+                <cipherSuite>TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256</cipherSuite>
+            </supportedCipherSuites>
             <provider>org.bouncycastle.jce.provider.BouncyCastleProvider</provider>
             <algorithm>SunX509</algorithm>
 
@@ -130,7 +178,7 @@
         </tls>
         <connectiontimeout>360</connectiontimeout>
         <connectionLimit>0</connectionLimit>
-        <connectionLimitPerIP>0</connectionLimitPerIP>
+        <connectionLimitPerIP>50</connectionLimitPerIP>
         <auth>
             <announce>forUnauthorizedAddresses</announce>
             <requireSSL>true</requireSSL>
@@ -148,11 +196,14 @@
         </auth>
         <authorizedAddresses>127.0.0.0/8</authorizedAddresses>
         <verifyIdentity>true</verifyIdentity>
-        <maxmessagesize>0</maxmessagesize>
+        <maxmessagesize>40M</maxmessagesize>
         <addressBracketsEnforcement>true</addressBracketsEnforcement>
         <smtpGreeting>Apache JAMES awesome SMTP Server</smtpGreeting>
         <handlerchain>
             <handler class="mx.agromarin.james.odoo.OdooValidRcptHandler"/>
+            <handler class="org.apache.james.smtpserver.fastfail.MaxRcptHandler">
+                <maxRcpt>200</maxRcpt>
+            </handler>
             <!-- Odoo's outgoing mail server signs in as this account, and sends as any of its users and its bounce
                  address. Its password is the ir.mail_server's; keep a second one here while rotating it. -->
             <handler class="org.apache.james.smtpserver.ConfigurationAuthHook">

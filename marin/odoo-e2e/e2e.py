@@ -12,6 +12,7 @@ import secrets
 import shutil
 import signal
 import smtplib
+import socket
 import socketserver
 import ssl
 import subprocess
@@ -322,9 +323,7 @@ class James:
         text = text.replace("<username>odoo@agromarin.mx</username>", f"<username>{ODOO_ACCOUNT}</username>")
         text = text.replace("<password>change-me</password>", f"<password>{ODOO_ACCOUNT_PASSWORD}</password>")
         smtp.write_text(text)
-        edit(conf / "imapserver.xml",
-             (r"<bind>0\.0\.0\.0:143</bind>", f"<bind>127.0.0.1:{self.ports['imap']}</bind>"),
-             (r'<imapserver enabled="true">(\s*<jmxName>imapserver-ssl</jmxName>)', r'<imapserver enabled="false">\1'))
+        edit(conf / "imapserver.xml", (r"<bind>0\.0\.0\.0:993</bind>", f"<bind>127.0.0.1:{self.ports['imap']}</bind>"))
         with (conf / "jmap.properties").open("a") as jmap:
             jmap.write(f"\njmap.port={self.ports['jmap']}\nurl.prefix=http://127.0.0.1:{self.ports['jmap']}\n")
         edit(conf / "jmx.properties", (r"(?m)^jmx\.enabled=true$", "jmx.enabled=false"))
@@ -440,7 +439,7 @@ class Suite:
         return self.odoo.sql(f"SELECT count(*) FROM mail_message WHERE message_id = '<{message_id}>' AND model = '{model}'")
 
     def imap(self, *criteria, mailbox="INBOX"):
-        with imaplib.IMAP4("127.0.0.1", self.james.ports["imap"]) as imap:
+        with imaplib.IMAP4_SSL("127.0.0.1", self.james.ports["imap"], ssl_context=ssl._create_unverified_context()) as imap:
             imap.login(MARIA, MARIA_PASSWORD)
             if imap.select(mailbox)[0] != "OK":
                 return []
@@ -596,7 +595,7 @@ class Suite:
         check("T13 the Odoo account with a wrong password is refused", refused)
 
     def imap_login(self, password):
-        with imaplib.IMAP4("127.0.0.1", self.james.ports["imap"]) as imap:
+        with imaplib.IMAP4_SSL("127.0.0.1", self.james.ports["imap"], ssl_context=ssl._create_unverified_context()) as imap:
             try:
                 imap.login(MARIA, password)
                 return True
@@ -664,6 +663,33 @@ class Suite:
         check("T19 mail Rspamd only marks is accepted and filed in the Spam folder", filed)
         check("T19 and not in the inbox", not self.imap("SUBJECT", f'"{subject}"'))
 
+    def t20_limits(self):
+        with smtplib.SMTP("127.0.0.1", self.james.ports["smtp"], timeout=30) as smtp:
+            smtp.ehlo()
+            code, text = smtp.mail("zed@supplier.test", options=["SIZE=45000000"])
+        check("T20 a message announced larger than 40 MB is refused at MAIL FROM", code == 552, f"{code} {text!r}")
+        with smtplib.SMTP("127.0.0.1", self.james.ports["smtp"], timeout=30) as smtp:
+            smtp.ehlo()
+            smtp.mail("zed@supplier.test")
+            codes = [smtp.rcpt(f"ventas@{DOMAIN}")[0] for _ in range(101)]
+        check("T20 the 101st recipient of a message is refused", codes[99] != 452 and codes[100] == 452,
+              f"100th {codes[99]}, 101st {codes[100]}")
+        sockets = []
+        try:
+            for _ in range(20):
+                sockets.append(socket.create_connection(("127.0.0.1", self.james.ports["smtp"]), timeout=10))
+                sockets[-1].recv(512)
+            extra = socket.create_connection(("127.0.0.1", self.james.ports["smtp"]), timeout=10)
+            try:
+                greeting = extra.recv(512)
+            except OSError:
+                greeting = b""
+            extra.close()
+        finally:
+            for open_socket in sockets:
+                open_socket.close()
+        check("T20 a 21st connection from one address is not served", not greeting.startswith(b"220"), repr(greeting[:60]))
+
     def t10_health(self):
         check("T10 James's Odoo directory health check is healthy", self.james.health() == "healthy",
               self.james.health())
@@ -671,7 +697,7 @@ class Suite:
 
 TESTS = ["t1_odoo_address", "t2_mailbox", "t3_unknown", "t4_token", "t5_new_alias", "t6_archived_alias",
          "t7_archived_meanwhile", "t8_reply", "t9_both", "t11_odoo_sends", "t12_person_sends", "t13_odoo_account",
-         "t10_health", "t17_gtube", "t18_forged_dmarc", "t19_marked_spam", "t14_odoo_password", "t15_revoked_key",
+         "t10_health", "t17_gtube", "t18_forged_dmarc", "t19_marked_spam", "t20_limits", "t14_odoo_password", "t15_revoked_key",
          "t16_closed_mailbox"]
 
 

@@ -23,3 +23,9 @@ the edge of Odoo's mail:
 
 The OdooInbound token is the one Odoo's local fetchmail server issues ("Issue Inbound Token"), in
 `conf/odoo-inbound.token`, readable by James only. `marin/odoo-e2e/run.sh` runs this configuration against a real Odoo.
+
+The edge listens on 25 (SMTP, STARTTLS), 587 (submission, STARTTLS and authentication required) and 993 (IMAPS);
+465 and 143 are closed, and JMAP listens on the loopback for nginx. Every TLS port offers TLS 1.3 and 1.2 with
+forward-secret AEAD ciphers only, and a client may not renegotiate (`jvm.properties`): `marin/tls-check/run.sh` holds
+it with testssl.sh. On 25 a client has 20 connections, a message 100 recipients and 40 MB; on 587, 50 connections,
+200 recipients and 40 MB.

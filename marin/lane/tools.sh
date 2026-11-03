@@ -130,6 +130,14 @@ rspamd_root() {  # -> the root Rspamd and its libraries are unpacked in; its bin
     echo "$root"
 }
 
+testssl() {  # -> path of testssl.sh
+    local src=$LANE_CACHE/testssl.sh-3.2.4
+    if [[ ! -x $src/testssl.sh ]]; then
+        tar -xzf "$(fetch "$TESTSSL_URL" sha256 "$TESTSSL_SHA256")" -C "$LANE_CACHE"
+    fi
+    echo "$src/testssl.sh"
+}
+
 postgres_bindir() {
     local bindir=${PG_BINDIR:-/usr/lib/postgresql/$PG_MAJOR/bin}
     if [[ ! -x $bindir/initdb ]]; then
