@@ -110,6 +110,15 @@ dkimpy() {
     echo "$src"
 }
 
+unpacked() {  # name url sha256 -> path of the unpacked package's usr/bin
+    local root=$LANE_CACHE/$1
+    if [[ ! -x $root/usr/bin/$1 ]]; then
+        rm -rf "$root" && mkdir -p "$root"
+        dpkg-deb -x "$(fetch "$2" sha256 "$3")" "$root"
+    fi
+    echo "$root/usr/bin"
+}
+
 postgres_bindir() {
     local bindir=${PG_BINDIR:-/usr/lib/postgresql/$PG_MAJOR/bin}
     if [[ ! -x $bindir/initdb ]]; then
