@@ -23,6 +23,7 @@ import static org.apache.james.PostgresJamesConfiguration.EventBusImpl.RABBITMQ;
 
 import java.io.FileNotFoundException;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -113,6 +114,7 @@ import com.google.inject.util.Modules;
 
 import mx.agromarin.james.odoo.OdooConfiguration;
 import mx.agromarin.james.odoo.OdooModule;
+import mx.agromarin.james.odoo.OdooUsersModule;
 
 public class PostgresJamesServerMain implements JamesServerMain {
 
@@ -199,16 +201,17 @@ public class PostgresJamesServerMain implements JamesServerMain {
 
     public static GuiceJamesServer createServer(PostgresJamesConfiguration configuration) {
         SearchConfiguration searchConfiguration = configuration.searchConfiguration();
+        Optional<OdooConfiguration> odooConfiguration = odooConfiguration(configuration);
 
         return GuiceJamesServer.forConfiguration(configuration)
             .combineWith(POSTGRES_MODULE_AGGREGATE.apply(configuration))
             .combineWith(SearchModuleChooser.chooseModules(searchConfiguration))
             .combineWith(chooseSearchTextModules(searchConfiguration))
-            .combineWith(chooseUsersRepositoryModule(configuration))
+            .combineWith(chooseUsersRepositoryModule(configuration, odooConfiguration))
             .combineWith(chooseBlobStoreModules(configuration))
             .combineWith(chooseDeletedMessageVaultModules(configuration.getDeletedMessageVaultConfiguration()))
             .combineWith(chooseRLSSupportPostgresMailboxModule(configuration))
-            .combineWith(chooseOdooModule(configuration))
+            .combineWith(odooConfiguration.<Module>map(any -> new OdooModule()).orElse(Modules.EMPTY_MODULE))
             .overrideWith(chooseJmapModules(configuration))
             .overrideWith(chooseTaskManagerModules(configuration))
             .overrideWith(chooseDropListsModule(configuration));
@@ -221,23 +224,27 @@ public class PostgresJamesServerMain implements JamesServerMain {
         return List.of();
     }
 
-    private static Module chooseOdooModule(PostgresJamesConfiguration configuration) {
+    private static Optional<OdooConfiguration> odooConfiguration(PostgresJamesConfiguration configuration) {
         PropertiesProvider propertiesProvider = new PropertiesProvider(new FileSystemImpl(configuration.directories()),
             configuration.configurationPath());
         try {
-            propertiesProvider.getConfiguration(OdooConfiguration.CONFIGURATION_NAME);
-            return new OdooModule();
+            return Optional.of(OdooConfiguration.from(propertiesProvider.getConfiguration(OdooConfiguration.CONFIGURATION_NAME)));
         } catch (FileNotFoundException e) {
-            return Modules.EMPTY_MODULE;
+            return Optional.empty();
         } catch (ConfigurationException e) {
             throw new IllegalArgumentException("Cannot read " + OdooConfiguration.CONFIGURATION_NAME + ".properties", e);
         }
     }
 
-    private static List<Module> chooseUsersRepositoryModule(PostgresJamesConfiguration configuration) {
-        return List.of(PostgresUsersRepositoryModule.USER_CONFIGURATION_MODULE,
-            Modules.combine(new UsersRepositoryModuleChooser(new PostgresUsersRepositoryModule())
-                .chooseModules(configuration.getUsersRepositoryImplementation())));
+    private static List<Module> chooseUsersRepositoryModule(PostgresJamesConfiguration configuration,
+                                                            Optional<OdooConfiguration> odooConfiguration) {
+        Module users = Modules.combine(new UsersRepositoryModuleChooser(new PostgresUsersRepositoryModule())
+            .chooseModules(configuration.getUsersRepositoryImplementation()));
+        if (odooConfiguration.filter(OdooConfiguration::usersEnabled).isPresent()) {
+            // The users table stays: PostgresDelegationStore keeps delegations in it.
+            users = Modules.override(users).with(new OdooUsersModule());
+        }
+        return List.of(PostgresUsersRepositoryModule.USER_CONFIGURATION_MODULE, users);
     }
 
     private static List<Module> chooseBlobStoreModules(PostgresJamesConfiguration configuration) {

@@ -25,15 +25,15 @@ import org.apache.james.core.MailAddress;
 import org.apache.mailet.base.GenericRecipientMatcher;
 
 public class RecipientIsOdoo extends GenericRecipientMatcher {
-    private final OdooAddresses addresses;
+    private final OdooDirectory addresses;
 
     @Inject
-    public RecipientIsOdoo(OdooAddresses addresses) {
+    public RecipientIsOdoo(OdooDirectory addresses) {
         this.addresses = addresses;
     }
 
     @Override
     public boolean matchRecipient(MailAddress recipient) {
-        return addresses.lookup(recipient) == OdooAddresses.Lookup.ODOO;
+        return addresses.lookup(recipient) == OdooDirectory.Lookup.ODOO;
     }
 }

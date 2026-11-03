@@ -74,7 +74,7 @@
                 <name>X-SMIME-Status</name>
                 <onMailetException>ignore</onMailetException>
             </mailet>
-            <mailet match="mx.agromarin.james.odoo.OdooAddressesUnknown" class="Requeue">
+            <mailet match="mx.agromarin.james.odoo.OdooDirectoryUnknown" class="Requeue">
                 <processor>transport</processor>
                 <delay>30s</delay>
             </mailet>

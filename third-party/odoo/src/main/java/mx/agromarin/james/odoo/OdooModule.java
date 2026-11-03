@@ -36,7 +36,7 @@ import com.google.inject.multibindings.ProvidesIntoSet;
 public class OdooModule extends AbstractModule {
     @Override
     protected void configure() {
-        Multibinder.newSetBinder(binder(), HealthCheck.class).addBinding().to(OdooAddressesHealthCheck.class);
+        Multibinder.newSetBinder(binder(), HealthCheck.class).addBinding().to(OdooDirectoryHealthCheck.class);
     }
 
     @Provides
@@ -47,14 +47,14 @@ public class OdooModule extends AbstractModule {
 
     @Provides
     @Singleton
-    OdooAddresses odooAddresses(OdooConfiguration configuration) {
-        return OdooAddresses.of(configuration);
+    OdooDirectory odooAddresses(OdooConfiguration configuration) {
+        return OdooDirectory.of(configuration);
     }
 
     @ProvidesIntoSet
-    InitializationOperation startOdooAddresses(OdooAddresses addresses) {
+    InitializationOperation startOdooDirectory(OdooDirectory addresses) {
         return InitilizationOperationBuilder
-            .forClass(OdooAddresses.class)
+            .forClass(OdooDirectory.class)
             .init(addresses::start);
     }
 }

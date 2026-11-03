@@ -118,7 +118,7 @@
       },
       "third-party/odoo": {
         "skipped": 0,
-        "tests": 28
+        "tests": 34
       }
     },
     "pg-jmap": {

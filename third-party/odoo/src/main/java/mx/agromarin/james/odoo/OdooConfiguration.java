@@ -27,7 +27,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.james.util.DurationParser;
 
 public record OdooConfiguration(String databaseUrl, String databaseUser, Optional<String> databasePassword,
-                                Duration refreshInterval) {
+                                Duration refreshInterval, boolean usersEnabled) {
     public static final String CONFIGURATION_NAME = "odoo";
     public static final Duration DEFAULT_REFRESH_INTERVAL = Duration.ofSeconds(30);
 
@@ -43,7 +43,8 @@ public record OdooConfiguration(String databaseUrl, String databaseUser, Optiona
             throw new ConfigurationException("refresh.interval must be positive, got " + refresh);
         }
         return new OdooConfiguration(url, required(configuration, "database.user"),
-            Optional.ofNullable(configuration.getString("database.password", null)), refresh);
+            Optional.ofNullable(configuration.getString("database.password", null)), refresh,
+            configuration.getBoolean("users.enabled", false));
     }
 
     private static String required(Configuration configuration, String key) throws ConfigurationException {

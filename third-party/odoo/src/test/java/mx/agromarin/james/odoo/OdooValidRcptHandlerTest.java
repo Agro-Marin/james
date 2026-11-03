@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -54,7 +55,7 @@ class OdooValidRcptHandlerTest {
 
     private Set<String> odoo = Set.of("ventas@agromarin.test", "catchall@agromarin.test", "alias@elsewhere.test");
     private SQLException failure;
-    private OdooAddresses addresses;
+    private OdooDirectory addresses;
     private MemoryUsersRepository users;
     private OdooValidRcptHandler handler;
 
@@ -67,11 +68,11 @@ class OdooValidRcptHandlerTest {
         MemoryRecipientRewriteTable rrt = new MemoryRecipientRewriteTable();
         rrt.setDomainList(domains);
         rrt.setConfiguration(RecipientRewriteTableConfiguration.DEFAULT_ENABLED);
-        addresses = new OdooAddresses(() -> {
+        addresses = new OdooDirectory(() -> {
             if (failure != null) {
                 throw failure;
             }
-            return odoo;
+            return new OdooDirectory.Contents(odoo, Map.of());
         }, Duration.ofSeconds(30), Clock.systemUTC());
         handler = new OdooValidRcptHandler(users, rrt, domains, addresses);
     }

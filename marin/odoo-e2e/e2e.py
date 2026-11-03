@@ -34,7 +34,7 @@ from james import edit, free_port, wait_until_up, webadmin  # noqa: E402
 PG_BINDIR = Path(os.environ.get("PG_BINDIR", "/usr/lib/postgresql/18/bin"))
 DOMAIN = "agromarin.test"
 MARIA = f"maria.orozco@{DOMAIN}"
-MARIA_PASSWORD = "e2e-pass-1"
+MARIA_PASSWORD = None
 READER = "james_odoo_reader"
 ODOO_ACCOUNT = "odoo@agromarin.mx"
 ODOO_ACCOUNT_PASSWORD = secrets.token_urlsafe(18)
@@ -279,14 +279,13 @@ class James:
         state = {"home": str(self.home), "ports": self.ports, "password": self.password}
         wait_until_up(state, self.process)
         webadmin(state, "PUT", f"/domains/{DOMAIN}")
-        webadmin(state, "PUT", f"/users/{MARIA}", {"password": MARIA_PASSWORD})
         self.state = state
 
     def log(self):
         return self.out.read_text(errors="replace")
 
     def health(self):
-        request = urllib.request.Request(f"http://127.0.0.1:{self.ports['webadmin']}/healthcheck/checks/Odoo%20addresses",
+        request = urllib.request.Request(f"http://127.0.0.1:{self.ports['webadmin']}/healthcheck/checks/Odoo%20directory",
                                          headers={"Password": self.password})
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
@@ -508,14 +507,49 @@ class Suite:
                 refused = True
         check("T13 the Odoo account with a wrong password is refused", refused)
 
+    def imap_login(self, password):
+        with imaplib.IMAP4("127.0.0.1", self.james.ports["imap"]) as imap:
+            try:
+                imap.login(MARIA, password)
+                return True
+            except imaplib.IMAP4.error:
+                return False
+
+    def t14_odoo_password(self):
+        check("T14 Maria's mail key, made in Odoo, opens her mailbox", self.imap_login(MARIA_PASSWORD))
+        check("T14 her Odoo login password does not", not self.imap_login(self.ids["odoo_password"]))
+        check("T14 the James users are Odoo's mailboxes, read-only",
+              self.webadmin_status("PUT", f"/users/nuevo@{DOMAIN}", {"password": "x"}) >= 400)
+
+    def webadmin_status(self, method, path, body=None):
+        try:
+            return webadmin(self.james.state, method, path, body)
+        except urllib.error.HTTPError as error:
+            return error.code
+
+    def t15_revoked_key(self):
+        committed = self.odoo.shell("revoke_mail_keys")["committed_at"]
+        refused = wait(lambda: not self.imap_login(MARIA_PASSWORD), 70)
+        delay = time.time() - committed
+        check("T15 a mail key revoked in Odoo stops opening the mailbox within a minute", refused and delay <= 60,
+              f"{delay:.0f} s")
+
+    def t16_closed_mailbox(self):
+        assert self.rcpt(MARIA)[0] == 250
+        committed = self.odoo.shell("close_mailbox")["committed_at"]
+        refused = wait(lambda: self.rcpt(MARIA)[0] == 550, 70)
+        delay = time.time() - committed
+        check("T16 a mailbox closed in Odoo is refused at RCPT within a minute", refused and delay <= 60,
+              f"{delay:.0f} s")
+
     def t10_health(self):
-        check("T10 James's Odoo addresses health check is healthy", self.james.health() == "healthy",
+        check("T10 James's Odoo directory health check is healthy", self.james.health() == "healthy",
               self.james.health())
 
 
 TESTS = ["t1_odoo_address", "t2_mailbox", "t3_unknown", "t4_token", "t5_new_alias", "t6_archived_alias",
          "t7_archived_meanwhile", "t8_reply", "t9_both", "t11_odoo_sends", "t12_person_sends", "t13_odoo_account",
-         "t10_health"]
+         "t10_health", "t14_odoo_password", "t15_revoked_key", "t16_closed_mailbox"]
 
 
 def main(run, repo, checkout, python, names):
@@ -528,7 +562,9 @@ def main(run, repo, checkout, python, names):
         odoo.install()
         ids = odoo.shell("setup")
         cluster.sql("odoo_e2e", f"GRANT USAGE ON SCHEMA public TO {READER}",
-                    f"GRANT SELECT ON mail_gateway_recipient TO {READER}")
+                    f"GRANT SELECT ON mail_gateway_recipient, mail_mailbox, mail_mailbox_key TO {READER}")
+        global MARIA_PASSWORD
+        MARIA_PASSWORD = ids["mail_key"]
         odoo.start()
         print("e2e: starting James", flush=True)
         gateway = Gateway()

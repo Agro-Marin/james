@@ -4,12 +4,14 @@ E2E_ARG its argument; the result is one JSON line after RESULT."""
 import json
 import os
 import time
+from datetime import datetime, timedelta
 
 from odoo import Command
 
 from odoo.addons.mail.tests.common import mail_new_test_user
 
 DOMAIN = "agromarin.test"
+ODOO_PASSWORD = "maria-odoo-login-1"
 
 
 def setup():
@@ -20,6 +22,8 @@ def setup():
     admin.email = f"admin@{DOMAIN}"
     maria = mail_new_test_user(env, login="maria", groups="base.group_user", name="Maria Orozco",
                                email=f"maria.orozco@{DOMAIN}")
+    maria.password = ODOO_PASSWORD
+    maria.has_mailbox = True
     bea = mail_new_test_user(env, login="bea", groups="base.group_user", name="Bea Ventas", email=f"bea@{DOMAIN}")
     env["mail.inbox"].create({"name": "Ventas", "kind": "shared", "alias_name": "ventas", "alias_domain_id": domain.id,
                               "user_ids": [Command.set((maria | bea).ids)]})
@@ -29,8 +33,11 @@ def setup():
     env.cr.commit()
     action = env(user=env.ref("base.user_admin"))["fetchmail.server"].browse(server.id).action_issue_inbound_token()
     env.cr.commit()
+    mail_key = env["res.users.apikeys"].with_user(maria)._generate("mail", "Phone", datetime.now() + timedelta(days=364))
+    env.cr.commit()
     return {"server_id": server.id, "token": action["params"]["message"].split("\n", 1)[0].strip(),
-            "partner_id": partner.id, "note_message_id": note.message_id}
+            "partner_id": partner.id, "note_message_id": note.message_id, "mail_key": mail_key,
+            "odoo_password": ODOO_PASSWORD}
 
 
 def create_inbox(name):
@@ -69,7 +76,20 @@ def notify(subject):
             "unsent": [[mail.state, mail.failure_reason] for mail in mails.exists() if mail.state != "sent"]}
 
 
-ACTIONS = {"setup": setup, "create_inbox": create_inbox, "archive_inbox": archive_inbox, "outgoing": outgoing,
+def revoke_mail_keys():
+    maria = env["res.users"].search([("login", "=", "maria")])
+    env["res.users.apikeys"].sudo().search([("user_id", "=", maria.id)])._revoke_keys()
+    env.cr.commit()
+    return {"committed_at": time.time()}
+
+
+def close_mailbox():
+    env["res.users"].search([("login", "=", "maria")]).has_mailbox = False
+    env.cr.commit()
+    return {"committed_at": time.time()}
+
+
+ACTIONS = {"setup": setup, "revoke_mail_keys": revoke_mail_keys, "close_mailbox": close_mailbox, "create_inbox": create_inbox, "archive_inbox": archive_inbox, "outgoing": outgoing,
            "notify": notify}
 action = ACTIONS[os.environ["E2E_ACTION"]]
 result = action(os.environ["E2E_ARG"]) if os.environ.get("E2E_ARG") else action()

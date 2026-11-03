@@ -43,11 +43,11 @@ public class OdooValidRcptHandler extends ValidRcptHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(OdooValidRcptHandler.class);
 
     private final UsersRepository users;
-    private final OdooAddresses addresses;
+    private final OdooDirectory addresses;
 
     @Inject
     public OdooValidRcptHandler(UsersRepository users, RecipientRewriteTable recipientRewriteTable, DomainList domains,
-                                OdooAddresses addresses) {
+                                OdooDirectory addresses) {
         super(users, recipientRewriteTable, domains);
         this.users = users;
         this.addresses = addresses;
@@ -55,15 +55,15 @@ public class OdooValidRcptHandler extends ValidRcptHandler {
 
     @Override
     public HookResult doRcpt(SMTPSession session, MaybeSender sender, MailAddress rcpt) {
-        OdooAddresses.Lookup lookup = addresses.lookup(rcpt);
-        if (lookup == OdooAddresses.Lookup.NOT_ODOO) {
+        OdooDirectory.Lookup lookup = addresses.lookup(rcpt);
+        if (lookup == OdooDirectory.Lookup.NOT_ODOO) {
             return super.doRcpt(session, sender, rcpt);
         }
         try {
             if (!isLocalDomain(session, rcpt.getDomain())) {
                 return super.doRcpt(session, sender, rcpt);
             }
-            if (lookup == OdooAddresses.Lookup.ODOO) {
+            if (lookup == OdooDirectory.Lookup.ODOO) {
                 if (users.contains(users.getUsername(rcpt))) {
                     LOGGER.error("{} is both an Odoo address and a James user: mail for it is deferred until one drops it",
                         rcpt.asString());

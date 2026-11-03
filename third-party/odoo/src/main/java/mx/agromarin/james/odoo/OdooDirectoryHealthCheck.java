@@ -31,19 +31,19 @@ import org.reactivestreams.Publisher;
 
 import reactor.core.publisher.Mono;
 
-public class OdooAddressesHealthCheck implements HealthCheck {
-    private static final ComponentName COMPONENT_NAME = new ComponentName("Odoo addresses");
+public class OdooDirectoryHealthCheck implements HealthCheck {
+    private static final ComponentName COMPONENT_NAME = new ComponentName("Odoo directory");
     private static final int MISSED_REFRESHES = 3;
 
-    private final OdooAddresses addresses;
+    private final OdooDirectory addresses;
     private final Clock clock;
 
     @Inject
-    public OdooAddressesHealthCheck(OdooAddresses addresses) {
+    public OdooDirectoryHealthCheck(OdooDirectory addresses) {
         this(addresses, Clock.systemUTC());
     }
 
-    OdooAddressesHealthCheck(OdooAddresses addresses, Clock clock) {
+    OdooDirectoryHealthCheck(OdooDirectory addresses, Clock clock) {
         this.addresses = addresses;
         this.clock = clock;
     }

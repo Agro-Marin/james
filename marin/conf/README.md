@@ -9,7 +9,7 @@ the edge of Odoo's mail:
   On 587, Odoo's outgoing mail server signs in as `odoo@agromarin.mx` (`ConfigurationAuthHook`), which may send as
   any address; people sign in with their own passwords (`UsersRepositoryAuthHook`, needed once any AuthHook is
   configured).
-- `mailetcontainer.xml`: in `transport`, mail waits while Odoo's addresses were never read (`OdooAddressesUnknown`),
+- `mailetcontainer.xml`: in `transport`, mail waits while Odoo's addresses were never read (`OdooDirectoryUnknown`),
   and an Odoo address goes to `odoo-deliver` (`RecipientIsOdoo`), where `OdooInbound` posts it to Odoo's
   `/mail/inbound/<server id>`. A deferral is retried every 5 minutes for a day, then bounced.
   In `relay`, mail whose envelope sender is in a James domain (people's, and Odoo's `bounce@`) is DKIM-signed with

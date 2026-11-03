@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 
 import org.apache.james.backends.postgres.PostgresFixture.Database;
@@ -32,10 +33,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-class OdooAddressesDatabaseTest {
+class OdooDirectoryDatabaseTest {
     private static final PostgresServer SERVER = PostgresServer.get();
     private static final Database ADMIN = Database.DEFAULT_DATABASE;
     private static final String DATABASE = "odoo_addresses_t" + ProcessHandle.current().pid();
+    private static final String HASH = "$pbkdf2-sha512$6000$mcjzpgbtZP1w5ZbK16qX.g$"
+        + "oDNFmShW1I62bCy7.0ULZJLoAlPT/Xsz4gBWSvk3I0C1oijqgMaOvIwP91yuQiiQeHdLMl8ZW0sROn1X0IlN5Q";
     private static final String READER = "james_odoo_reader_t" + ProcessHandle.current().pid();
 
     @BeforeAll
@@ -49,9 +52,17 @@ class OdooAddressesDatabaseTest {
             + "('compras@agromarin.test', true), (NULL, true)");
         SERVER.execute(ADMIN, DATABASE, "CREATE VIEW mail_gateway_recipient AS "
             + "SELECT lower(alias_full_name) AS address, 'alias'::varchar AS kind FROM mail_alias");
+        SERVER.execute(ADMIN, DATABASE, "CREATE TABLE res_users_apikeys (address varchar, index varchar, key varchar, "
+            + "expiration_date timestamp)");
+        SERVER.execute(ADMIN, DATABASE, "INSERT INTO res_users_apikeys VALUES ('maria@agromarin.test', '25229a67', "
+            + "'" + HASH + "', '2027-06-01 00:00:00'), ('ventas@agromarin.test', 'aaaaaaaa', 'x', NULL)");
+        SERVER.execute(ADMIN, DATABASE, "CREATE VIEW mail_mailbox AS SELECT 'Maria@AgroMarin.test'::varchar AS address, "
+            + "5 AS user_id UNION SELECT 'bea@agromarin.test', 6");
+        SERVER.execute(ADMIN, DATABASE, "CREATE VIEW mail_mailbox_key AS SELECT * FROM res_users_apikeys");
         SERVER.execute(ADMIN, DATABASE, "REVOKE ALL ON SCHEMA public FROM PUBLIC");
         SERVER.execute(ADMIN, DATABASE, "GRANT USAGE ON SCHEMA public TO " + READER);
-        SERVER.execute(ADMIN, DATABASE, "GRANT SELECT ON mail_gateway_recipient TO " + READER);
+        SERVER.execute(ADMIN, DATABASE, "GRANT SELECT ON mail_gateway_recipient, mail_mailbox, mail_mailbox_key TO "
+            + READER);
     }
 
     @AfterAll
@@ -60,15 +71,33 @@ class OdooAddressesDatabaseTest {
         SERVER.execute(ADMIN, "postgres", "DROP ROLE IF EXISTS " + READER);
     }
 
-    private static OdooConfiguration configuration(String user, String password) {
+    private static OdooConfiguration configuration(String user, String password, boolean users) {
         return new OdooConfiguration("jdbc:postgresql://" + SERVER.host() + ":" + SERVER.port() + "/" + DATABASE,
-            user, Optional.of(password), Duration.ofSeconds(30));
+            user, Optional.of(password), Duration.ofSeconds(30), users);
     }
 
     @Test
     void aReadOnlyRoleOnTheViewReadsEveryAddressLowerCased() throws Exception {
-        assertThat(OdooAddresses.database(configuration(READER, "reader")).load())
+        assertThat(OdooDirectory.database(configuration(READER, "reader", false)).load().addresses())
             .containsExactlyInAnyOrder("ventas@agromarin.test", "compras@agromarin.test");
+    }
+
+    @Test
+    void withoutOdooUsersTheMailboxesAreNotRead() throws Exception {
+        assertThat(OdooDirectory.database(configuration(READER, "reader", false)).load().mailboxes()).isEmpty();
+    }
+
+    @Test
+    void withOdooUsersEachMailboxComesWithItsKeysAndOnlyThem() throws Exception {
+        var mailboxes = OdooDirectory.database(configuration(READER, "reader", true)).load().mailboxes();
+
+        assertThat(mailboxes).containsOnlyKeys("maria@agromarin.test", "bea@agromarin.test");
+        assertThat(mailboxes.get("bea@agromarin.test")).isEmpty();
+        assertThat(mailboxes.get("maria@agromarin.test")).singleElement().satisfies(key -> {
+            assertThat(key.expiration()).contains(Instant.parse("2027-06-01T00:00:00Z"));
+            assertThat(key.opens("25229a6777bdf7b70698d90ff4d6f0d5632f6445", Instant.parse("2027-01-04T15:00:00Z")))
+                .isTrue();
+        });
     }
 
     @Test
@@ -98,7 +127,7 @@ class OdooAddressesDatabaseTest {
 
     @Test
     void aRefusedLoginIsAnErrorNotAnEmptySet() {
-        assertThatThrownBy(() -> OdooAddresses.database(configuration(READER, "wrong")).load())
+        assertThatThrownBy(() -> OdooDirectory.database(configuration(READER, "wrong", true)).load())
             .isInstanceOf(SQLException.class);
     }
 }

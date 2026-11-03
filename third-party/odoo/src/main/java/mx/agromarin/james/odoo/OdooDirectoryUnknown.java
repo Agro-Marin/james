@@ -32,11 +32,11 @@ import org.apache.mailet.base.GenericMatcher;
  * Matches every recipient while Odoo's addresses were never read, so mail spooled before a restart waits for them
  * instead of being routed as if no address were Odoo's.
  */
-public class OdooAddressesUnknown extends GenericMatcher {
-    private final OdooAddresses addresses;
+public class OdooDirectoryUnknown extends GenericMatcher {
+    private final OdooDirectory addresses;
 
     @Inject
-    public OdooAddressesUnknown(OdooAddresses addresses) {
+    public OdooDirectoryUnknown(OdooDirectory addresses) {
         this.addresses = addresses;
     }
 
