@@ -65,6 +65,12 @@
                 <matcher match="SentByMailet"/>
                 <matcher match="org.apache.james.jmap.mailet.SentByJmap"/>
             </matcher>
+            <matcher name="inbound-to-mailbox" match="org.apache.james.mailetcontainer.impl.matchers.And">
+                <matcher match="RecipientIsLocal"/>
+                <matcher match="org.apache.james.mailetcontainer.impl.matchers.Not">
+                    <matcher match="SMTPAuthSuccessful"/>
+                </matcher>
+            </matcher>
 
             <mailet match="All" class="RemoveMimeHeader">
                 <name>bcc</name>
@@ -83,6 +89,13 @@
             </mailet>
             <mailet match="All" class="RecipientRewriteTable">
                 <errorProcessor>rrt-error</errorProcessor>
+            </mailet>
+            <!-- What Rspamd rejects never got here (RspamdSMTPHook); what it only marks goes to the Spam folder. -->
+            <mailet match="inbound-to-mailbox" class="org.apache.james.rspamd.RspamdScanner">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+            <mailet match="IsMarkedAsSpam=org.apache.james.rspamd.status" class="WithStorageDirective">
+                <targetFolderName>Spam</targetFolderName>
             </mailet>
             <mailet match="RecipientIsLocal" class="VacationMailet">
                 <onMailetException>ignore</onMailetException>

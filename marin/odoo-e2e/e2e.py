@@ -156,9 +156,12 @@ class Rspamd:
             # The suite's mail comes from loopback, which Rspamd takes for local and would not check.
             "spf.conf": "check_local = true;\n",
             "dmarc.conf": 'check_local = true;\nactions { reject = "reject"; quarantine = "add header"; }\n',
+            "multimap.conf": 'E2E_SPAMMY { type = "header"; header = "Subject"; regexp = true; '
+                             'map = "$LOCAL_CONFDIR/spammy.map"; score = 8.0; }\n',
         }
         for name, text in files.items():
             (local / "local.d" / name).write_text(text)
+        (local / "spammy.map").write_text("/e2e-spammy/i\n")
         etc, share = root / "etc" / "rspamd", root / "usr" / "share" / "rspamd"
         variables = {"CONFDIR": etc, "LOCAL_CONFDIR": local, "RUNDIR": self.dir / "run", "DBDIR": self.dir / "db",
                      "LOGDIR": self.dir / "log", "PLUGINSDIR": share / "plugins", "SHAREDIR": share,
@@ -436,10 +439,11 @@ class Suite:
     def odoo_messages(self, message_id, model="discuss.channel"):
         return self.odoo.sql(f"SELECT count(*) FROM mail_message WHERE message_id = '<{message_id}>' AND model = '{model}'")
 
-    def imap(self, *criteria):
+    def imap(self, *criteria, mailbox="INBOX"):
         with imaplib.IMAP4("127.0.0.1", self.james.ports["imap"]) as imap:
             imap.login(MARIA, MARIA_PASSWORD)
-            imap.select("INBOX")
+            if imap.select(mailbox)[0] != "OK":
+                return []
             _, data = imap.search(None, *criteria)
             messages = []
             for number in data[0].split():
@@ -653,6 +657,13 @@ class Suite:
         time.sleep(3)
         check("T18 and it is not in Maria's inbox", not self.imap("SUBJECT", f'"Su cuenta T18 {RUN_ID}"'))
 
+    def t19_marked_spam(self):
+        subject = f"Oferta e2e-spammy T19 {RUN_ID}"
+        self.send(message(f"t19-{RUN_ID}@supplier.test", MARIA, subject), [MARIA])
+        filed = wait(lambda: len(self.imap("SUBJECT", f'"{subject}"', mailbox="Spam")) == 1, 30)
+        check("T19 mail Rspamd only marks is accepted and filed in the Spam folder", filed)
+        check("T19 and not in the inbox", not self.imap("SUBJECT", f'"{subject}"'))
+
     def t10_health(self):
         check("T10 James's Odoo directory health check is healthy", self.james.health() == "healthy",
               self.james.health())
@@ -660,7 +671,7 @@ class Suite:
 
 TESTS = ["t1_odoo_address", "t2_mailbox", "t3_unknown", "t4_token", "t5_new_alias", "t6_archived_alias",
          "t7_archived_meanwhile", "t8_reply", "t9_both", "t11_odoo_sends", "t12_person_sends", "t13_odoo_account",
-         "t10_health", "t17_gtube", "t18_forged_dmarc", "t14_odoo_password", "t15_revoked_key",
+         "t10_health", "t17_gtube", "t18_forged_dmarc", "t19_marked_spam", "t14_odoo_password", "t15_revoked_key",
          "t16_closed_mailbox"]
 
 

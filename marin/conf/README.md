@@ -12,6 +12,8 @@ the edge of Odoo's mail:
 - `rspamd.properties`: where Rspamd listens. On port 25, `RspamdSMTPHook` asks it about each message at the end of
   DATA: what it rejects (spam, GTUBE, a sender failing a DMARC reject policy) is refused with 554 5.7.1, what it
   defers gets 451 4.7.1, and when it cannot answer the message is accepted.
+  Mail it accepted for a mailbox is scanned again before delivery (`RspamdScanner`), and what Rspamd marks as spam
+  is filed in the Spam folder.
 - `mailetcontainer.xml`: in `transport`, mail waits while Odoo's addresses were never read (`OdooDirectoryUnknown`),
   and an Odoo address goes to `odoo-deliver` (`RecipientIsOdoo`), where `OdooInbound` posts it to Odoo's
   `/mail/inbound/<server id>`. A deferral is retried every 5 minutes for a day, then bounced.
