@@ -298,70 +298,64 @@ class James:
                 shutil.copy(overlay, conf / overlay.name)
         self.ports = {name: free_port() for name in ("smtp", "submission", "imap", "jmap", "webadmin")}
         self.password = secrets.token_urlsafe(24)
-        token_file = conf / "odoo-inbound.token"
+        site = self.home / "site"
+        site.mkdir()
+        token_file = site / "odoo-inbound.token"
         token_file.write_text(token + "\n")
         token_file.chmod(0o600)
         self.token_file = token_file
-        (conf / "dkim-james1.pem").write_bytes(dkim_key.private_bytes(
+        dkim = site / "dkim-james1.pem"
+        dkim.write_bytes(dkim_key.private_bytes(
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
-        edit(conf / "postgres.properties",
-             (r"database\.name=james", "database.name=james_e2e"),
-             (r"database\.host=postgres", "database.host=127.0.0.1"),
-             (r"database\.port=5432", f"database.port={cluster.port}"),
-             (r"ssl\.mode=allow", "ssl.mode=disable"))
-        edit(conf / "odoo.properties",
-             (r"(?m)^database\.url=.*$", f"database.url=jdbc:postgresql://127.0.0.1:{cluster.port}/odoo_e2e"),
-             (r"(?m)^database\.password=.*$", "database.password=reader"))
+        tls_key, tls_certificates = site / "privkey.pem", site / "fullchain.pem"
+        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(tls_key), "-out",
+                        str(tls_certificates), "-days", "2", "-subj", f"/CN=mail.{DOMAIN}"], check=True, capture_output=True)
+        logs = self.home / "logs"
+        logs.mkdir()
+        environment = {
+            "JAMES_PG_PORT": str(cluster.port), "JAMES_PG_DATABASE": "james_e2e", "JAMES_PG_PASSWORD": "secret1",
+            "JAMES_ODOO_DATABASE_URL": f"jdbc:postgresql://127.0.0.1:{cluster.port}/odoo_e2e",
+            "JAMES_ODOO_DATABASE_PASSWORD": "reader",
+            "JAMES_ODOO_INBOUND_URL": f"http://127.0.0.1:{odoo.port}/mail/inbound/{server_id}",
+            "JAMES_ODOO_INBOUND_TOKEN_FILE": str(token_file),
+            "JAMES_ODOO_SMTP_PASSWORD": ODOO_ACCOUNT_PASSWORD,
+            "JAMES_DKIM_KEY": f"file://{dkim}",
+            "JAMES_SES_HOST": "127.0.0.1", "JAMES_SES_USERNAME": "", "JAMES_SES_PASSWORD": "",
+            "JAMES_TLS_KEY": f"file://{tls_key}", "JAMES_TLS_CERTIFICATES": f"file://{tls_certificates}",
+            "JAMES_WEBADMIN_PASSWORD": self.password, "JAMES_LOG_DIR": str(logs),
+        }
         smtp = conf / "smtpserver.xml"
         text = smtp.read_text()
         text = text.replace("<bind>0.0.0.0:25</bind>", f"<bind>127.0.0.1:{self.ports['smtp']}</bind>")
         text = text.replace("<bind>0.0.0.0:587</bind>", f"<bind>127.0.0.1:{self.ports['submission']}</bind>")
-        text = re.sub(r'<smtpserver enabled="true">(\s*<jmxName>smtpserver-TLS</jmxName>)', r'<smtpserver enabled="false">\1',
-                      text)
         text = text.replace("<authorizedAddresses>127.0.0.0/8</authorizedAddresses>",
                             "<authorizedAddresses>127.0.0.2/32</authorizedAddresses>")
         text = text.replace("<username>odoo@agromarin.mx</username>", f"<username>{ODOO_ACCOUNT}</username>")
-        text = text.replace("<password>change-me</password>", f"<password>{ODOO_ACCOUNT_PASSWORD}</password>")
         smtp.write_text(text)
         edit(conf / "imapserver.xml", (r"<bind>0\.0\.0\.0:993</bind>", f"<bind>127.0.0.1:{self.ports['imap']}</bind>"))
         with (conf / "jmap.properties").open("a") as jmap:
             jmap.write(f"\njmap.port={self.ports['jmap']}\nurl.prefix=http://127.0.0.1:{self.ports['jmap']}\n")
         edit(conf / "jmx.properties", (r"(?m)^jmx\.enabled=true$", "jmx.enabled=false"))
         edit(conf / "rspamd.properties", (r"(?m)^rspamdUrl=.*$", f"rspamdUrl=http://127.0.0.1:{rspamd.port}"))
-        edit(conf / "webadmin.properties",
-             (r"(?m)^port=8000$", f"port={self.ports['webadmin']}"),
-             (r"(?m)^password\.generate=true$", f"password={self.password}"))
+        edit(conf / "webadmin.properties", (r"(?m)^port=8000$", f"port={self.ports['webadmin']}"))
         edit(conf / "mailetcontainer.xml",
-             (r"<url>https://odoo\.example\.com/mail/inbound/1</url>",
-              f"<url>http://127.0.0.1:{odoo.port}/mail/inbound/{server_id}</url>"),
-             (r"<tokenFile>conf/odoo-inbound\.token</tokenFile>", f"<tokenFile>{token_file}</tokenFile>"),
              (r"<maxAttempts>288</maxAttempts>", "<maxAttempts>10</maxAttempts>"),
              (r"<delay>5m</delay>", "<delay>5s</delay>"),
-             (r"<gateway>email-smtp\.us-east-2\.amazonaws\.com</gateway>", "<gateway>127.0.0.1</gateway>"),
              (r"<gatewayPort>587</gatewayPort>", f"<gatewayPort>{gateway.port}</gatewayPort>"),
-             (r"\s*<gatewayUsername>change-me</gatewayUsername>", ""),
-             (r"\s*<gatewayPassword>change-me</gatewayPassword>", ""),
+             (r"\s*<gatewayUsername>[^<]*</gatewayUsername>", ""),
+             (r"\s*<gatewayPassword>[^<]*</gatewayPassword>", ""),
              (r"<startTLS>true</startTLS>", "<startTLS>false</startTLS>"),
              (r"<verifyServerIdentity>true</verifyServerIdentity>", "<verifyServerIdentity>false</verifyServerIdentity>"),
              (r"<delayTime>[^<]*</delayTime>", "<delayTime>5 * 5 seconds</delayTime>"),
              (r"<maxRetries>16</maxRetries>", "<maxRetries>5</maxRetries>"))
-        logs = self.home / "logs"
-        logs.mkdir()
-        edit(conf / "logback.xml",
-             (r"<file>/logs/james\.log</file>", f"<file>{logs}/james.log</file>"),
-             (r"<fileNamePattern>/logs/", f"<fileNamePattern>{logs}/"))
-        subprocess.run(
-            ["keytool", "-genkeypair", "-alias", "james", "-keyalg", "RSA", "-keysize", "2048", "-storetype", "PKCS12",
-             "-keystore", str(conf / "keystore"), "-storepass", "james72laBalle", "-keypass", "james72laBalle",
-             "-dname", f"CN=mail.{DOMAIN}", "-validity", "2"],
-            check=True, capture_output=True)
         self.out = self.home / "james.out"
         with self.out.open("w") as out:
             self.process = subprocess.Popen(
                 ["java", "-Xms256m", "-Xmx1g", "-Dworking.directory=.", "-Dlogback.configurationFile=conf/logback.xml",
                  "-Djdk.tls.ephemeralDHKeySize=2048", "-Dextra.props=conf/jvm.properties",
                  "-jar", "james-server-postgres-app.jar"],
-                cwd=self.home, stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
+                cwd=self.home, stdout=out, stderr=subprocess.STDOUT, start_new_session=True,
+                env={**os.environ, **environment})
         state = {"home": str(self.home), "ports": self.ports, "password": self.password}
         wait_until_up(state, self.process)
         webadmin(state, "PUT", f"/domains/{DOMAIN}")

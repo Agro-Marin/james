@@ -63,9 +63,6 @@ def start(run_dir, repo):
             shutil.copy(overlay, conf / overlay.name)
     ports = {"smtp": free_port(), "submission": free_port(), "imaps": free_port(), "webadmin": free_port(),
              "jmap": free_port()}
-    edit(conf / "postgres.properties",
-         (r"database\.name=james", "database.name=james_tls"), (r"database\.host=postgres", "database.host=127.0.0.1"),
-         (r"database\.port=5432", f"database.port={pg_port}"), (r"ssl\.mode=allow", "ssl.mode=disable"))
     smtp = conf / "smtpserver.xml"
     smtp.write_text(smtp.read_text().replace("<bind>0.0.0.0:25</bind>", f"<bind>127.0.0.1:{ports['smtp']}</bind>")
                     .replace("<bind>0.0.0.0:587</bind>", f"<bind>127.0.0.1:{ports['submission']}</bind>")
@@ -73,23 +70,32 @@ def start(run_dir, repo):
     imap = conf / "imapserver.xml"
     imap.write_text(imap.read_text().replace("<bind>0.0.0.0:993</bind>", f"<bind>127.0.0.1:{ports['imaps']}</bind>")
                     .replace("<bind>0.0.0.0:143</bind>", f"<bind>127.0.0.1:{free_port()}</bind>"))
-    edit(conf / "webadmin.properties", (r"(?m)^port=8000$", f"port={ports['webadmin']}"),
-         (r"(?m)^password\.generate=true$", "password=tls-check"))
+    edit(conf / "webadmin.properties", (r"(?m)^port=8000$", f"port={ports['webadmin']}"))
     with (conf / "jmap.properties").open("a") as jmap:
         jmap.write(f"\njmap.port={ports['jmap']}\n")
     edit(conf / "jmx.properties", (r"(?m)^jmx\.enabled=true$", "jmx.enabled=false"))
-    (home / "logs").mkdir()
-    edit(conf / "logback.xml", (r"<file>/logs/james\.log</file>", f"<file>{home}/logs/james.log</file>"),
-         (r"<fileNamePattern>/logs/", f"<fileNamePattern>{home}/logs/"))
-    run("openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048", "-out", conf / "dkim-james1.pem")
-    run("keytool", "-genkeypair", "-alias", "james", "-keyalg", "RSA", "-keysize", "2048", "-storetype", "PKCS12",
-        "-keystore", conf / "keystore", "-storepass", "james72laBalle", "-keypass", "james72laBalle",
-        "-dname", "CN=mail.agromarin.test", "-validity", "2")
+    site, logs = home / "site", home / "logs"
+    site.mkdir()
+    logs.mkdir()
+    run("openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048", "-out", site / "dkim-james1.pem")
+    run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", site / "privkey.pem", "-out",
+        site / "fullchain.pem", "-days", "2", "-subj", "/CN=mail.agromarin.test")
+    environment = {
+        "JAMES_PG_PORT": str(pg_port), "JAMES_PG_DATABASE": "james_tls", "JAMES_PG_PASSWORD": "secret1",
+        "JAMES_ODOO_DATABASE_URL": "jdbc:postgresql://127.0.0.1:1/none", "JAMES_ODOO_DATABASE_PASSWORD": "none",
+        "JAMES_ODOO_INBOUND_URL": "http://127.0.0.1:1/mail/inbound/1",
+        "JAMES_ODOO_INBOUND_TOKEN_FILE": str(site / "odoo-inbound.token"), "JAMES_ODOO_SMTP_PASSWORD": "tls-check",
+        "JAMES_DKIM_KEY": f"file://{site}/dkim-james1.pem", "JAMES_SES_HOST": "127.0.0.1", "JAMES_SES_USERNAME": "",
+        "JAMES_SES_PASSWORD": "", "JAMES_TLS_KEY": f"file://{site}/privkey.pem",
+        "JAMES_TLS_CERTIFICATES": f"file://{site}/fullchain.pem", "JAMES_WEBADMIN_PASSWORD": "tls-check",
+        "JAMES_LOG_DIR": str(logs),
+    }
     with (home / "james.out").open("w") as out:
         process = subprocess.Popen(
             ["java", "-Xms256m", "-Xmx1g", "-Dworking.directory=.", "-Dlogback.configurationFile=conf/logback.xml",
              "-Djdk.tls.ephemeralDHKeySize=2048", "-Dextra.props=conf/jvm.properties", "-jar",
-             "james-server-postgres-app.jar"], cwd=home, stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
+             "james-server-postgres-app.jar"], cwd=home, stdout=out, stderr=subprocess.STDOUT, start_new_session=True,
+            env={**os.environ, **environment})
     # James's health check stays unhealthy here, with no Odoo behind it: wait for the ports instead.
     deadline = time.monotonic() + 180
     while not all(listening(ports[name]) for name in ("smtp", "submission", "imaps")):

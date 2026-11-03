@@ -26,7 +26,7 @@
     <context>
         <!-- When the domain part of the postmaster mailAddress is missing, the default domain is appended.
         You can configure it to (for example) <postmaster>postmaster@myDomain.com</postmaster> -->
-        <postmaster>postmaster</postmaster>
+        <postmaster>postmaster@agromarin.mx</postmaster>
     </context>
 
     <spooler>
@@ -121,14 +121,14 @@
             <mailet match="SenderHostIsLocal" class="org.apache.james.jdkim.mailets.DKIMSign">
                 <signatureTemplate>v=1; s=james1; d=%MAIL_FROM; h=from:to:cc:reply-to:subject:date:message-id:in-reply-to:references:mime-version:content-type:content-transfer-encoding; a=rsa-sha256; c=relaxed/relaxed; bh=; b=;</signatureTemplate>
                 <defaultDomain>agromarin.mx</defaultDomain>
-                <privateKeyFilepath>file://conf/dkim-james1.pem</privateKeyFilepath>
+                <privateKeyFilepath>${env:JAMES_DKIM_KEY}</privateKeyFilepath>
             </mailet>
             <mailet match="All" class="RemoteDelivery">
                 <outgoing>outgoing</outgoing>
-                <gateway>email-smtp.us-east-2.amazonaws.com</gateway>
+                <gateway>${env:JAMES_SES_HOST}</gateway>
                 <gatewayPort>587</gatewayPort>
-                <gatewayUsername>change-me</gatewayUsername>
-                <gatewayPassword>change-me</gatewayPassword>
+                <gatewayUsername>${env:JAMES_SES_USERNAME}</gatewayUsername>
+                <gatewayPassword>${env:JAMES_SES_PASSWORD}</gatewayPassword>
                 <startTLS>true</startTLS>
                 <verifyServerIdentity>true</verifyServerIdentity>
                 <delayTime>5 * 5 minutes, 5 * 1 hour, 6 * 4 hours</delayTime>
@@ -176,8 +176,8 @@
 
         <processor state="odoo-deliver" enableJmx="true">
             <mailet match="All" class="mx.agromarin.james.odoo.OdooInbound">
-                <url>https://odoo.example.com/mail/inbound/1</url>
-                <tokenFile>conf/odoo-inbound.token</tokenFile>
+                <url>${env:JAMES_ODOO_INBOUND_URL}</url>
+                <tokenFile>${env:JAMES_ODOO_INBOUND_TOKEN_FILE}</tokenFile>
                 <maxAttempts>288</maxAttempts>
                 <retryProcessor>odoo-retry</retryProcessor>
                 <bounceProcessor>bounces</bounceProcessor>

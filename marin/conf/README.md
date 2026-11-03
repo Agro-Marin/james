@@ -1,5 +1,20 @@
 # The fork's deployment configuration
 
+Every site value and secret is an `${env:...}` reference, so these files deploy unchanged; `marin/release.sh` packs
+them with the app, and agromarin-infra's mail role supplies the environment (`/etc/james/james.env`):
+
+| Variable | What |
+|---|---|
+| `JAMES_PG_PORT`, `JAMES_PG_DATABASE`, `JAMES_PG_PASSWORD` | James's own database, on 127.0.0.1 as role `james` |
+| `JAMES_ODOO_DATABASE_URL`, `JAMES_ODOO_DATABASE_PASSWORD` | Odoo's database, read as `james_odoo_reader` |
+| `JAMES_ODOO_INBOUND_URL`, `JAMES_ODOO_INBOUND_TOKEN_FILE` | Odoo's `/mail/inbound/<server id>` and its token |
+| `JAMES_ODOO_SMTP_PASSWORD` | the password Odoo's outgoing mail server signs in to 587 with |
+| `JAMES_DKIM_KEY` | `file://` URL of the `james1` DKIM private key (PKCS#8 PEM) |
+| `JAMES_SES_HOST`, `JAMES_SES_USERNAME`, `JAMES_SES_PASSWORD` | SES's SMTP endpoint and credentials |
+| `JAMES_TLS_KEY`, `JAMES_TLS_CERTIFICATES` | `file://` URLs of the certificate's key and chain (PEM) |
+| `JAMES_WEBADMIN_PASSWORD` | the WebAdmin password (WebAdmin listens on localhost) |
+| `JAMES_LOG_DIR` | where `james.log` is written |
+
 Laid over `server/apps/postgres-app/sample-configuration` (and `sample-configuration-single`), these files make James
 the edge of Odoo's mail:
 

@@ -31,9 +31,8 @@ under the License.
             <!-- To create a new keystore execute:
               keytool -genkey -alias james -keyalg RSA -storetype PKCS12 -keystore /path/to/james/conf/keystore
              -->
-            <keystore>file://conf/keystore</keystore>
-            <keystoreType>PKCS12</keystoreType>
-            <secret>james72laBalle</secret>
+            <privateKey>${env:JAMES_TLS_KEY}</privateKey>
+            <certificates>${env:JAMES_TLS_CERTIFICATES}</certificates>
             <supportedProtocols>
                 <protocol>TLSv1.3</protocol>
                 <protocol>TLSv1.2</protocol>
@@ -75,9 +74,8 @@ under the License.
             <!-- To create a new keystore execute:
               keytool -genkey -alias james -keyalg RSA -storetype PKCS12 -keystore /path/to/james/conf/keystore
              -->
-            <keystore>file://conf/keystore</keystore>
-            <keystoreType>PKCS12</keystoreType>
-            <secret>james72laBalle</secret>
+            <privateKey>${env:JAMES_TLS_KEY}</privateKey>
+            <certificates>${env:JAMES_TLS_CERTIFICATES}</certificates>
             <supportedProtocols>
                 <protocol>TLSv1.3</protocol>
                 <protocol>TLSv1.2</protocol>
